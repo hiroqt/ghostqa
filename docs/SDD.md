@@ -25,6 +25,7 @@ PRD defines WHAT; ARD defines boundaries and interfaces; `docs/specs/GQ-XXX-*.md
 | GQ-008 | `docs/specs/GQ-008-live-ui.md` | `tests/route.test.ts`, `tests/run-events.test.ts`, `tests/e2e/demo.spec.ts` |
 | GQ-009 | `docs/specs/GQ-009-demo-fixture.md` | `tests/fixture.test.ts`, `tests/e2e/demo.spec.ts` |
 | GQ-010 | `docs/specs/GQ-010-submission-transparency.md` | `.github/workflows/ci.yml`, local check/build/test/e2e |
+| GQ-011 | `docs/specs/GQ-011-ai-slop-review.md` | `tests/slop-review.test.ts`, `tests/e2e/demo.spec.ts` |
 
 ## Decision records
 For architectural changes, create `docs/decisions/ADR-NNN-title.md` describing context, options, decision and consequences. No changes to frozen MVP without approval.

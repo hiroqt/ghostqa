@@ -2,7 +2,7 @@
 Version 0.1 | MVP constraints
 
 ## Architecture
-Next.js UI -> server-side run controller -> policy gate -> Playwright Chromium -> local demo site. Observer collects screenshot, sanitized DOM and errors. Model adapter proposes a typed action. Evaluator compares expected and actual. Replay verifier checks suspected failure. Reporter produces one result.
+Next.js UI -> server-side run controller -> policy gate -> Playwright Chromium -> one allowed origin. The default is the local demo; GQ-011 may review a public origin in explicit live mode. Observer collects screenshot, sanitized DOM and errors. Model adapter proposes a typed action for functional tests. Evaluator compares expected and actual. Replay verifier checks suspected failure. Reporter produces one result.
 
 ## Modules and contracts
 - `src/lib/contracts.ts`: `Observation`, `ProposedAction`, `ActionTrace`, and model `Decision` types; Zod runtime validation of model actions.
@@ -34,7 +34,9 @@ A bug is `verified` only if an explicit assertion (e.g. successful registration 
 Do not hardcode `muse-spark-1.3`, endpoint, multimodal input format, or tool-call schema as facts. Confirm access, currently supported model ID, screenshot input support, request/response shapes, rate limits and terms in official Meta documentation and with a smoke test. If unavailable, use mock adapter for development and report real integration blocked. Keep `META_MODEL_ID` configurable.
 
 ## Operational limits
-One Chromium browser with one active context at a time (a fresh context for replay), 10 max actions total, 60-second timeout, 1 replay, local demo origin only, no credential persistence, no arbitrary external network. Abort and cleanup on errors.
+One Chromium browser with one active context at a time (a fresh context for replay), 10 max actions total, 60-second timeout, 1 replay, one allowed origin per run, no credential persistence, no arbitrary cross-origin network. Abort and cleanup on errors.
+
+GQ-011 review may use one user-submitted public origin only when explicit live mode is enabled. It reuses the live URL admission policy, blocks cross-origin requests and non-GET/HEAD requests, and makes no model call or replay. The local fixture path allowlist remains the default.
 
 ## Tradeoffs
 Use in-memory state for speed; no DB. Use one run at a time for reproducibility. Prefer explicit DOM locator references over model-generated CSS where possible. A seeded deterministic fixture is more defensible than arbitrary-site coverage.
