@@ -57,5 +57,11 @@ export async function POST(request: Request): Promise<Response> {
         .finally(() => { running = false; controller.close(); });
     },
   });
-  return new Response(stream, { headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store' } });
+  return new Response(stream, {
+    headers: {
+      'content-type': 'application/x-ndjson; charset=utf-8',
+      'cache-control': 'no-cache, no-store, no-transform',
+      'x-accel-buffering': 'no',
+    },
+  });
 }
