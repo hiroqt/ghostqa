@@ -12,17 +12,25 @@ export function authorizeAction(raw: unknown, gate: RunGate): ProposedAction {
   switch (action.type) {
     case 'navigate':
       if (!action.value) throw new Error('Navigation URL required');
-      return { ...action, value: assertAllowedUrl(action.value, gate.allowedOrigins) };
+      action.value = assertAllowedUrl(action.value, gate.allowedOrigins);
+      if (!['/', '/register', '/health'].includes(new URL(action.value).pathname) || new URL(action.value).search) {
+        throw new Error('Navigation path denied');
+      }
+      return action;
     case 'click':
-      if (!action.target || /\b(delete|remove|pay|purchase|send|upload|download)\b/i.test(action.target)) {
+      // shortcut: fixture-only controls, expand only when another demo flow is approved.
+      if (!action.target || !['Create account', 'Register', 'Health'].includes(action.target)) {
         throw new Error('Unsafe click target');
       }
       break;
     case 'fill':
-      if (!action.target || action.value === undefined) throw new Error('Fill target and value required');
+      if (!action.target || !['Email', 'Password'].includes(action.target) || action.value === undefined) {
+        throw new Error('Unsafe fill target');
+      }
       break;
     case 'press':
-      if (!action.target || !['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown'].includes(action.value ?? '')) {
+      if (!action.target || !['Email', 'Password'].includes(action.target) ||
+          !['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown'].includes(action.value ?? '')) {
         throw new Error('Unsafe key');
       }
       break;
@@ -44,7 +52,9 @@ export async function installNetworkGuard(context: BrowserContext, allowedOrigin
     try {
       const url = assertAllowedUrl(route.request().url(), allowedOrigins);
       const method = route.request().method();
-      if (!['GET', 'HEAD'].includes(method) && !(method === 'POST' && new URL(url).pathname === '/register')) {
+      const parsed = new URL(url);
+      if (!['/', '/register', '/health'].includes(parsed.pathname) || parsed.search ||
+          (!['GET', 'HEAD'].includes(method) && !(method === 'POST' && parsed.pathname === '/register'))) {
         throw new Error('Request method denied');
       }
       await route.continue();

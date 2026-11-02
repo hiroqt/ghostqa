@@ -6,7 +6,7 @@ Goal: execute one model-proposed browser action only when the local run policy p
 Inputs and types: unknown proposed action; exact allowed origins; action count; run start time; Playwright page/context.
 Outputs and types: validated typed action or a policy error; action outcome.
 Preconditions: GQ-001 has accepted the initial URL; browser context is dedicated to this run.
-Invariants / security: HTTP(S) loopback origin only; all requests and redirects pass the same origin gate; only navigate, click, fill, press, scroll, wait; no arbitrary selectors or JavaScript; ten actions and sixty seconds maximum including replay.
+Invariants / security: HTTP(S) loopback origin only; all requests and redirects pass the same origin gate; this MVP permits only fixture paths (`/`, `/register`, `/health`) and known controls; only navigate, click, fill, press, scroll, wait; no arbitrary selectors or JavaScript; ten actions and sixty seconds maximum including replay.
 Happy-path example: fill Email with a synthetic address, then click Create account on the fixture.
 Failure-path example: action eleven, external redirect, Delete button, unsupported action, oversized fill, or expired run stops without execution.
 Acceptance criteria (Given/When/Then): Given an action within budget and on the configured origin, when executed, then one typed Playwright action occurs. Given a violation, when checked, then no browser action occurs. Given a cross-origin request or redirect, then it is aborted.
