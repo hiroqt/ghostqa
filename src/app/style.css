@@ -475,6 +475,7 @@ pre.code-block code { font: inherit; }
 .finding-details summary::before { content: '▶'; font-size: 9px; transition: transform 0.2s ease; }
 .finding-details[open] summary::before { transform: rotate(90deg); }
 .finding-details summary:hover { color: var(--text); }
+.finding-details summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 .finding-details ul {
   margin: 0;
