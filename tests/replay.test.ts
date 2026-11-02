@@ -67,8 +67,11 @@ test('replays exact steps in a fresh context and captures the repeated failure',
 test('closes a failed replay and rejects an over-budget replay before context creation', async () => {
   const failed = fakeBrowser(true);
   const gate = { allowedOrigins: ['http://127.0.0.1:3001'], actionCount: 1, startedAt: Date.now() };
+  const events: string[] = [];
   await expect(replayOnce(failed.browser, 'http://127.0.0.1:3001/register',
-    [{ type: 'click', target: 'Create account' }], gate, '/tmp/ghostqa-replay-failure')).rejects.toThrow('click failed');
+    [{ type: 'click', target: 'Create account' }], gate, '/tmp/ghostqa-replay-failure',
+    (action, outcome) => events.push(`${action.type}:${outcome}`))).rejects.toThrow('click failed');
+  expect(events).toEqual(['navigate:attempted', 'navigate:completed', 'click:attempted', 'click:failed']);
   expect(failed.isClosed()).toBe(true);
 
   const overBudget = fakeBrowser();

@@ -48,12 +48,22 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
     page.on('download', (download) => { void download.cancel(); });
     page.on('dialog', (dialog) => { void dialog.dismiss(); });
     page.on('popup', (popup) => { void popup.close(); });
+    async function perform(action: ProposedAction) {
+      const entry: ActionTrace = { action, outcome: 'attempted' };
+      trace.push(entry);
+      gate.actionCount++;
+      emit({ type: 'action', action: action.type, target: action.target ?? (action.type === 'navigate' ? action.value : '') });
+      try {
+        await executeAction(page, action);
+        entry.outcome = 'completed';
+      } catch (error) {
+        entry.outcome = 'failed';
+        throw error;
+      }
+    }
 
     const initial = authorizeAction({ type: 'navigate', value: url }, gate);
-    gate.actionCount++;
-    emit({ type: 'action', action: 'navigate', target: url });
-    await executeAction(page, initial);
-    trace.push({ action: initial, outcome: 'initial navigation completed' });
+    await perform(initial);
     const observer = createObserver(page, origin, join(evidenceDir, 'latest.png'));
     let observation = await observer.observe();
     emit({ type: 'status', message: 'Observing local page' });
@@ -70,11 +80,8 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
       }
       const before = observation;
       const action = authorizeAction(decision.action, gate);
-      gate.actionCount++;
-      emit({ type: 'action', action: action.type, target: action.target ?? '', message: decision.rationale });
-      await executeAction(page, action);
+      await perform(action);
       steps.push(action);
-      trace.push({ action, outcome: 'completed' });
       observation = await observer.observe();
       if (decision.expected !== 'Registration complete') continue;
 
@@ -83,11 +90,14 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
         return { report: buildReport({ status: suspected.status === 'no-finding' ? 'no-finding' : 'inconclusive', reason: suspected.actual, trace }) };
       }
       emit({ type: 'status', message: 'Replaying suspected failure once' });
-      const replay = await replayOnce(browser, url, steps, gate, evidenceDir);
-      for (const action of replay.replaySteps) {
-        trace.push({ action, outcome: 'replay completed' });
-        emit({ type: 'action', action: `replay ${action.type}`, target: action.target ?? (action.type === 'navigate' ? action.value : '') });
-      }
+      let replayEntry: ActionTrace | undefined;
+      const replay = await replayOnce(browser, url, steps, gate, evidenceDir, (action, outcome) => {
+        if (outcome === 'attempted') {
+          replayEntry = { action, outcome: 'replay attempted' };
+          trace.push(replayEntry);
+          emit({ type: 'action', action: `replay ${action.type}`, target: action.target ?? (action.type === 'navigate' ? action.value : '') });
+        } else if (replayEntry) replayEntry.outcome = `replay ${outcome}`;
+      });
       const final = evaluateOutcome({ expectedText: decision.expected, before, after: observation, replay });
       if (final.status !== 'verified') {
         return { report: buildReport({ status: 'inconclusive', reason: 'Failure did not reproduce consistently', trace }) };
@@ -99,6 +109,11 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
       });
       return { report, screenshot };
     }
+  } catch (error) {
+    const reason = Date.now() - gate.startedAt >= 60_000 ? 'Run timed out'
+      : error instanceof Error && /^(Action limit reached|Replay exceeds action limit)$/.test(error.message) ? error.message
+        : 'Run stopped safely; check the local fixture and Chromium';
+    return { report: buildReport({ status: 'inconclusive', reason, trace }) };
   } finally {
     if (timer) clearTimeout(timer);
     await browser?.close().catch(() => {});

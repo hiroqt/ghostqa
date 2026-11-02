@@ -47,6 +47,7 @@ test('verified report carries evidence and a Playwright test without entered val
 test.each(['no-finding', 'inconclusive'] as const)('%s has no bug claim or reproduction', (status) => {
   const report = buildReport({ status, reason: 'No confirmed failure', trace: verified.trace });
   expect(report.finding).toBeUndefined();
+  expect(report.trace).toHaveLength(3);
   expect(report.markdown).not.toContain('Verified finding');
   expect(JSON.stringify(report)).not.toContain(secret);
 });

@@ -13,6 +13,7 @@ export async function replayOnce(
   actions: readonly ProposedAction[],
   gate: RunGate,
   evidenceDir: string,
+  onAction?: (action: ProposedAction, outcome: 'attempted' | 'completed' | 'failed') => void,
 ): Promise<{ before: Observation; after: Observation; replaySteps: ProposedAction[] }> {
   if (actions.length === 0) throw new Error('No action to replay');
   const url = assertAllowedUrl(initialUrl, gate.allowedOrigins);
@@ -25,22 +26,31 @@ export async function replayOnce(
   try {
     await installNetworkGuard(context, gate.allowedOrigins);
     const page = await context.newPage();
+    async function perform(action: ProposedAction) {
+      onAction?.(action, 'attempted');
+      gate.actionCount++;
+      try {
+        await executeAction(page, action);
+        onAction?.(action, 'completed');
+      } catch (error) {
+        onAction?.(action, 'failed');
+        throw error;
+      }
+    }
     page.on('download', (download) => { void download.cancel(); });
     page.on('dialog', (dialog) => { void dialog.dismiss(); });
     const origin = new URL(url).origin;
     const beforeObserver = createObserver(page, origin, join(evidenceDir, 'replay-before.png'));
     const afterObserver = createObserver(page, origin, join(evidenceDir, 'replay-after.png'));
     authorizeAction(navigation, gate);
-    gate.actionCount++;
-    await executeAction(page, navigation);
+    await perform(navigation);
 
     const replaySteps = [navigation];
     let before: Observation | undefined;
     for (const [index, raw] of actions.entries()) {
       const action = authorizeAction(raw, gate);
       if (index === actions.length - 1) before = await beforeObserver.observe();
-      gate.actionCount++;
-      await executeAction(page, action);
+      await perform(action);
       replaySteps.push(action);
     }
     if (!before) throw new Error('Missing replay baseline');

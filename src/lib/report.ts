@@ -22,7 +22,7 @@ type Finding = {
   replaySteps: ProposedAction[];
   reproductionTest: string;
 };
-export type RunReport = { status: PlainOutcome['status'] | 'verified'; markdown: string; finding?: Finding };
+export type RunReport = { status: PlainOutcome['status'] | 'verified'; markdown: string; trace: SafeTrace[]; finding?: Finding };
 
 function cleanUrl(input: string): string {
   const url = new URL(input);
@@ -90,7 +90,11 @@ function reproductionTest(url: string, failureUrl: string, steps: ProposedAction
 export function buildReport(input: PlainOutcome | VerifiedOutcome): RunReport {
   const enteredValues = [...input.trace.map(({ action }) => action.type === 'fill' ? action.value ?? '' : '')];
   if (input.status !== 'verified') {
-    return { status: input.status, markdown: `${input.status}: ${scrub(input.reason, enteredValues)}` };
+    return {
+      status: input.status,
+      markdown: `${input.status}: ${scrub(input.reason, enteredValues)}`,
+      trace: input.trace.map(({ action, outcome }) => ({ action: safeAction(action, enteredValues), outcome: scrub(outcome, enteredValues) })),
+    };
   }
   enteredValues.push(...input.replaySteps.map((action) => action.type === 'fill' ? action.value ?? '' : ''));
   const failure = input.observation.httpFailures.find(({ status }) => status >= 500);
@@ -107,6 +111,7 @@ export function buildReport(input: PlainOutcome | VerifiedOutcome): RunReport {
   };
   return {
     status: 'verified',
+    trace: finding.trace,
     finding,
     markdown: `Verified finding\n\nExpected: ${finding.expected}\nActual: ${finding.actual}\nScreenshot: ${finding.screenshotPath}\nConsole: ${finding.consoleErrors.join(', ') || 'none'}\nHTTP: ${finding.httpFailures.map(({ url, status }) => `${status} ${url}`).join(', ')}\nTrace: ${finding.trace.map(({ action, outcome }) => `${action.type}${action.target ? ` ${action.target}` : ''} → ${outcome}`).join('; ')}\nReplay: ${finding.replaySteps.map(({ type, target }) => `${type}${target ? ` ${target}` : ''}`).join(' → ')}`,
   };

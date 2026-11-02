@@ -4,7 +4,7 @@ PRD link: GQ-007
 
 Goal: present one replay-confirmed, evidence-backed finding without leaking entered values.
 Inputs and types: terminal status (`verified`, `no-finding`, `inconclusive`); for verified, local URL, explicit expected and observed outcomes, observation, action trace, and replay actions.
-Outputs and types: JSON-safe report with Markdown summary; verified reports additionally contain screenshot reference, console/HTTP evidence, replay steps, and Playwright reproduction test text.
+Outputs and types: JSON-safe report with Markdown summary and redacted full action trace; verified reports additionally contain screenshot reference, console/HTTP evidence, replay steps, and Playwright reproduction test text.
 Preconditions: caller only supplies `verified` after one fresh-context replay confirms deterministic evidence. Evidence references point to this run's sanitized screenshots.
 Invariants / security: no reproduction test or finding for non-verified outcomes; no fill value is copied into JSON, Markdown, or test text; URLs in output omit query and fragment; test generation maps only typed actions to accessible Playwright locators, never raw JavaScript or CSS from page/model text.
 Happy-path example: registration POST returns 500 twice; report says expected registration success, actual HTTP 500, includes screenshot, trace, and Playwright test that expects no server failure.
