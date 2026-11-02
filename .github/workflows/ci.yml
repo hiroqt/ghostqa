@@ -1,5 +1,16 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -12,4 +23,5 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run test
-      # Enable e2e after fixture and test server are implemented.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
