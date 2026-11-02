@@ -14,10 +14,10 @@ const runRequest = z.strictObject({
 
 export async function POST(request: Request): Promise<Response> {
   const modelMode = process.env.MODEL_MODE ?? 'mock';
+  const liveMode = process.env.ALLOW_LIVE_SITES === 'true';
   if (modelMode !== 'mock' && modelMode !== 'meta') {
     return Response.json({ error: 'Unknown MODEL_MODE' }, { status: 503 });
   }
-  const liveMode = process.env.ALLOW_LIVE_SITES === 'true';
   let input: z.infer<typeof runRequest>;
   let url: string;
   try {
@@ -33,9 +33,10 @@ export async function POST(request: Request): Promise<Response> {
         .split(',').map((origin) => origin.trim()).filter(Boolean);
       url = assertAllowedUrl(input.url, origins);
     }
-  } catch {
+  } catch (err) {
+    const code = err instanceof Error ? (err as { code?: string }).code ?? err.message : String(err);
     const message = liveMode
-      ? 'Enter a valid public URL (https://example.com). Private and internal addresses are not allowed.'
+      ? `Enter a valid public URL (https://example.com). Private and internal addresses are not allowed. [${code}]`
       : 'Only the configured local demo URL is allowed';
     return Response.json({ error: message }, { status: 400 });
   }
