@@ -43,3 +43,11 @@ export type Suggestion = {
   image?: string;
   bounds?: { x: number; y: number; width: number; height: number };
 };
+
+export const COMMON_TEST_GOALS = [
+  { label: 'Register / sign up', goal: 'Try registering with synthetic credentials and check form submission' },
+  { label: 'Primary navigation & links', goal: 'Check primary navigation and visible links for broken destinations' },
+  { label: 'Primary CTA flow', goal: 'Click the main call-to-action control and verify the resulting page state' },
+  { label: 'Form inputs & validation', goal: 'Fill visible form inputs with synthetic values and verify submission' },
+  { label: 'Page health & console', goal: 'Verify the page renders its main heading cleanly with no HTTP or console errors' },
+] as const;

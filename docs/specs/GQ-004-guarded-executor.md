@@ -10,6 +10,8 @@ Invariants / security: HTTP(S) loopback origin only; all requests and redirects 
 Happy-path example: fill Email with a synthetic address, then click Create account on the fixture.
 Failure-path example: action eleven, external redirect, Delete button, unsupported action, oversized fill, or expired run stops without execution.
 Acceptance criteria (Given/When/Then): Given an action within budget and on the configured origin, when executed, then one typed Playwright action occurs. Given a violation, when checked, then no browser action occurs. Given a cross-origin request or redirect, then it is aborted.
+Given a `click`, `fill`, or `press` action in live mode, when the exact-match button/link or label is absent, then the executor falls back to a substring-matched visible button/link or input placeholder/name/aria-label with a bounded 4-second action timeout, and suppresses `target="_blank"` navigation hijacking by clearing the target attribute before clicking same-origin links.
+Given a single Playwright action or model decision failure after the browser has already observed the page, when the controller handles the error, then it records the failed action in the trace and finishes the run cleanly (or returns `no-finding` if prior observations succeeded without HTTP/console errors) rather than collapsing the entire run into a generic inconclusive crash.
 Unit test names: `tests/executor.test.ts` checks action schema, target requirements, destructive names, origin, action budget, and timeout.
 Integration/E2E test names: browser flow and rejected external URL after all implementation is complete.
 Out of scope: arbitrary websites, uploads, downloads, permission prompts, shell or JavaScript execution.

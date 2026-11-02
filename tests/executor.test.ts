@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import type { BrowserContext, Route } from 'playwright';
-import { authorizeAction, installNetworkGuard } from '../src/lib/executor';
+import type { BrowserContext, Page, Route } from 'playwright';
+import { authorizeAction, executeAction, installNetworkGuard } from '../src/lib/executor';
 
 const state = { allowedOrigins: ['http://127.0.0.1:3001'], actionCount: 0, startedAt: Date.now() };
 
@@ -72,4 +72,29 @@ test('live review allows same-origin reads and blocks writes and cross-origin re
     abort: async () => { outcomes.push('aborted'); },
   } as unknown as Route);
   expect(outcomes).toEqual(['continued', 'continued', 'aborted', 'aborted']);
+});
+
+test('executeAction falls back to substring-matched control or input placeholder when exact match is missing', async () => {
+  const clicked: string[] = [];
+  const filled: string[] = [];
+  const makeLoc = (count: number, name: string) => ({
+    first: () => ({
+      count: async () => count,
+      click: async () => { clicked.push(name); },
+      fill: async (val: string) => { filled.push(`${name}:${val}`); },
+      press: async (key: string) => { clicked.push(`${name}:${key}`); },
+    }),
+  });
+  const page = {
+    getByRole: (_role: string, opts?: { exact?: boolean }) => ({
+      or: () => makeLoc(opts?.exact ? 0 : 1, opts?.exact ? 'exact-role' : 'fuzzy-role'),
+    }),
+    getByLabel: (_label: string, opts?: { exact?: boolean }) => makeLoc(opts?.exact ? 0 : 1, opts?.exact ? 'exact-label' : 'fuzzy-label'),
+    getByPlaceholder: () => makeLoc(1, 'placeholder'),
+  } as unknown as Page;
+
+  await executeAction(page, { type: 'click', target: 'Learn more' });
+  await executeAction(page, { type: 'fill', target: 'Email', value: 'qa@example.test' });
+  expect(clicked).toEqual(['fuzzy-role']);
+  expect(filled).toEqual(['fuzzy-label:qa@example.test']);
 });

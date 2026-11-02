@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { MetaAdapter, MockAdapter, parseDecision, type ReasoningAdapter } from '../src/lib/model';
+import { COMMON_TEST_GOALS, fallbackSuggestions, MetaAdapter, MockAdapter, parseDecision, type ReasoningAdapter } from '../src/lib/model';
 
 const context = {
   observation: { screenshotPath: 'evidence/start.png', dom: '<button>Register</button>', consoleErrors: [], httpFailures: [] },
@@ -87,5 +87,21 @@ describe('GQ-003 reasoning adapter', () => {
     await expect(new MetaAdapter({ apiKey: 'k', client: oversized.client }).decide(context)).rejects.toThrow(/too large/);
     const unsafe = mockClient(JSON.stringify({ kind: 'action', action: { type: 'delete', target: 'account' }, expected: 'Gone', rationale: 'Delete' }));
     await expect(new MetaAdapter({ apiKey: 'k', client: unsafe.client }).decide(context)).rejects.toThrow();
+  });
+
+  it('extracts JSON decisions and suggestions even when wrapped in markdown code fences', async () => {
+    const decision = { kind: 'stop', reason: 'Page verified healthy' };
+    expect(parseDecision(`\`\`\`json\n${JSON.stringify(decision)}\n\`\`\``)).toEqual(decision);
+    const suggestions = [{ text: 'Add alt text', reason: 'Screen readers', selector: 'img', location: '<img>', codeSnippet: '<img alt="Hero">' }];
+    const { client } = mockClient(`Here are improvements:\n\`\`\`json\n${JSON.stringify(suggestions)}\n\`\`\``);
+    const adapter = new MetaAdapter({ apiKey: 'test-key', client });
+    expect(await adapter.suggestImprovements('{"headings":["Home"],"controls":[]}', '/nonexistent.png')).toEqual(suggestions);
+  });
+
+  it('provides common functional test goals and deterministic fallback suggestions when model returns none', () => {
+    expect(COMMON_TEST_GOALS.length).toBeGreaterThanOrEqual(4);
+    const fallback = fallbackSuggestions(JSON.stringify({ headings: ['Welcome'], controls: [{ text: 'Get started' }] }));
+    expect(fallback.length).toBeGreaterThanOrEqual(3);
+    expect(fallback.every((item) => item.text && item.reason && item.selector && item.location)).toBe(true);
   });
 });

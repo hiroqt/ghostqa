@@ -1,11 +1,61 @@
 import { readFile } from 'node:fs/promises';
 import OpenAI from 'openai';
-import { decisionSchema, type Decision, type DecisionContext, type Suggestion } from './contracts';
+import { COMMON_TEST_GOALS, decisionSchema, type Decision, type DecisionContext, type Suggestion } from './contracts';
+
+export { COMMON_TEST_GOALS };
+
+export const DEFAULT_EXPLORATORY_GOAL =
+  'Verify the page renders cleanly, exercise at most one safe same-origin control if relevant, and stop once the page state is confirmed.';
+
+function extractJsonText(input: string, open: '{' | '[', close: '}' | ']'): string {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(input);
+  const candidate = (fenced ? fenced[1] : input).trim();
+  const start = candidate.indexOf(open);
+  const end = candidate.lastIndexOf(close);
+  return start >= 0 && end > start ? candidate.slice(start, end + 1) : candidate;
+}
+
+export function fallbackSuggestions(dom = ''): Suggestion[] {
+  let headings: string[] = [];
+  let controls: Array<{ text?: string; label?: string; name?: string; type?: string }> = [];
+  try {
+    const parsed = JSON.parse(dom) as { headings?: string[]; controls?: Array<{ text?: string; label?: string; name?: string; type?: string }> };
+    if (Array.isArray(parsed.headings)) headings = parsed.headings;
+    if (Array.isArray(parsed.controls)) controls = parsed.controls;
+  } catch { /* ignore unparsed dom */ }
+  const firstHeading = headings[0] ? `"${headings[0].slice(0, 40)}"` : 'the primary heading';
+  const firstControl = controls.find((c) => c.text)?.text;
+  return [
+    {
+      text: `Add ARIA landmark roles around ${firstHeading} and navigation regions`,
+      reason: 'Landmarks help assistive technology users jump directly to main content and navigation.',
+      selector: 'header, main, nav, footer',
+      location: '<header> / <main>',
+      codeSnippet: '<header role="banner">\n  <nav aria-label="Primary">...</nav>\n</header>\n<main id="main-content">\n  ...\n</main>',
+    },
+    {
+      text: firstControl
+        ? `Ensure interactive control "${firstControl.slice(0, 32)}" has a clear focus-visible indicator and accessible name`
+        : 'Ensure all interactive controls and images expose descriptive accessible labels',
+      reason: 'Visible focus outlines and explicit labels prevent keyboard and screen-reader traps during functional flows.',
+      selector: 'a, button, input, img:not([alt])',
+      location: firstControl ? `<button/a "${firstControl.slice(0, 20)}">` : '<a> / <button>',
+      codeSnippet: '<!-- before -->\n<a href="/next">Continue</a>\n\n<!-- after -->\n<a href="/next" class="focus-visible:outline">Continue to account setup</a>',
+    },
+    {
+      text: 'Verify form and navigation actions surface explicit inline status or error feedback',
+      reason: 'Clear status regions (role="status" or role="alert") let users and automated checks confirm whether an action succeeded.',
+      selector: 'form, [role="status"], [role="alert"], main',
+      location: '<form> / [role="status"]',
+      codeSnippet: '<div role="status" aria-live="polite">\n  Action completed successfully.\n</div>',
+    },
+  ];
+}
 
 export function parseDecision(raw: unknown): Decision {
   if (typeof raw === 'string') {
     if (raw.length > 8192) throw new Error('Model response too large');
-    raw = JSON.parse(raw);
+    raw = JSON.parse(extractJsonText(raw, '{', '}'));
   }
   return decisionSchema.parse(raw);
 }
@@ -73,13 +123,15 @@ export type MetaAdapterOptions = {
 };
 
 const SYSTEM_PROMPT = [
-  'You are GhostQA, a cautious web QA agent driving one browser.',
+  'You are GhostQA, a cautious web QA agent driving one browser on a single allowed origin.',
   'You observe a sanitized DOM summary and, when available, a screenshot of the current page.',
   'Propose exactly ONE next step toward the goal, or stop.',
+  'If Prior actions already show that the goal was exercised or no further safe same-origin controls match the goal, return {"kind":"stop","reason":"..."} immediately.',
+  'Never propose clicking links that leave the current origin, and never repeat an action that already failed or completed in Prior actions.',
   'Reply with ONLY strict minified JSON, no prose, no markdown fences, matching one of:',
   '{"kind":"action","action":{"type":"navigate|click|fill|press|scroll|wait","target":"...","value":"..."},"expected":"the exact visible heading text you expect after this action","rationale":"why"}',
   'or {"kind":"stop","reason":"why you are stopping"}.',
-  'Use "target" for the control label and "value" for navigation URLs, fill text, key names, scroll pixels, or wait milliseconds.',
+  'Use "target" for the exact control text or label from Sanitized DOM controls, and "value" for navigation URLs, fill text, key names, scroll pixels, or wait milliseconds.',
   'The "expected" field must be the literal heading you expect to verify the outcome. Never include secrets or real credentials.',
 ].join('\n');
 
@@ -129,10 +181,10 @@ export class MetaAdapter implements ReasoningAdapter {
         messages: [{ role: 'user', content: parts }],
       });
       const content = response.choices?.[0]?.message?.content;
-      if (typeof content !== 'string') return [];
-      const parsed: unknown = JSON.parse(content.trim());
-      if (!Array.isArray(parsed)) return [];
-      return (parsed as unknown[])
+      if (typeof content !== 'string') return fallbackSuggestions(dom);
+      const parsed: unknown = JSON.parse(extractJsonText(content, '[', ']'));
+      if (!Array.isArray(parsed)) return fallbackSuggestions(dom);
+      const valid = (parsed as unknown[])
         .filter((s): s is Suggestion =>
           typeof s === 'object' && s !== null &&
           'text' in s && typeof (s as { text: unknown }).text === 'string' &&
@@ -142,8 +194,9 @@ export class MetaAdapter implements ReasoningAdapter {
           (!('reason' in s) || typeof (s as { reason: unknown }).reason === 'string'),
         )
         .slice(0, 5);
+      return valid.length > 0 ? valid : fallbackSuggestions(dom);
     } catch {
-      return [];
+      return fallbackSuggestions(dom);
     }
   }
 
@@ -153,7 +206,7 @@ export class MetaAdapter implements ReasoningAdapter {
       {
         type: 'text',
         text: [
-          `Goal: ${goal || '(none provided)'}`,
+          `Goal: ${goal.trim() || DEFAULT_EXPLORATORY_GOAL}`,
           `Prior actions: ${JSON.stringify(priorTrace)}`,
           `Console errors: ${JSON.stringify(observation.consoleErrors)}`,
           `HTTP failures: ${JSON.stringify(observation.httpFailures)}`,
