@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { assertAllowedUrl } from '../../../lib/policy';
+import { assertAllowedUrl, assertLiveUrl } from '../../../lib/policy';
 import { runDemo } from '../../../lib/run';
 
 export const runtime = 'nodejs';
@@ -18,15 +18,21 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Unknown MODEL_MODE' }, { status: 503 });
   }
   const liveMode = process.env.ALLOW_LIVE_SITES === 'true';
-  // Live mode builds the allowlist from ALLOWED_ORIGINS (public origins allowed);
-  // the safe default stays loopback-only when live mode is off.
-  const defaultOrigins = liveMode ? '' : 'http://127.0.0.1:3001';
   let input: z.infer<typeof runRequest>;
   let url: string;
   try {
     input = runRequest.parse(await request.json());
-    const origins = (process.env.ALLOWED_ORIGINS ?? defaultOrigins).split(',').map((origin) => origin.trim()).filter(Boolean);
-    url = assertAllowedUrl(input.url, origins, { liveMode });
+    if (liveMode) {
+      // Live mode: the per-run allowlist is derived from the submitted URL's
+      // origin. ALLOWED_ORIGINS is not required; private/internal hosts are
+      // rejected (SSRF). The run stays locked to this single origin.
+      url = assertLiveUrl(input.url).url;
+    } else {
+      // Safe default: loopback-only, allowlist from ALLOWED_ORIGINS.
+      const origins = (process.env.ALLOWED_ORIGINS ?? 'http://127.0.0.1:3001')
+        .split(',').map((origin) => origin.trim()).filter(Boolean);
+      url = assertAllowedUrl(input.url, origins);
+    }
   } catch {
     const message = liveMode ? 'Only an allowlisted origin is allowed' : 'Only the configured local demo URL is allowed';
     return Response.json({ error: message }, { status: 400 });
