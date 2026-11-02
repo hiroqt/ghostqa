@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { MetaAdapter, MockAdapter, parseDecision, type ReasoningAdapter } from '../src/lib/model';
 
 const context = {
@@ -6,6 +9,17 @@ const context = {
   goal: 'Try registering',
   priorTrace: [],
 };
+
+function mockClient(content: string) {
+  const create = vi.fn().mockResolvedValue({ choices: [{ message: { content } }] });
+  return { client: { chat: { completions: { create } } }, create };
+}
+
+function userContent(create: ReturnType<typeof vi.fn>): Array<{ type: string; text?: string; image_url?: { url: string } }> {
+  const messages = create.mock.calls[0][0].messages as Array<{ role: string; content: unknown }>;
+  const user = messages.find((message) => message.role === 'user');
+  return user!.content as Array<{ type: string; text?: string; image_url?: { url: string } }>;
+}
 
 describe('GQ-003 reasoning adapter', () => {
   it('accepts one complete action and STOP decision', () => {
@@ -34,8 +48,44 @@ describe('GQ-003 reasoning adapter', () => {
     expect(await adapter.decide(context)).toEqual({ kind: 'stop', reason: 'Mock decisions exhausted' });
   });
 
-  it('blocks live Meta requests until their contract is verified', async () => {
-    const adapter: ReasoningAdapter = new MetaAdapter();
-    await expect(adapter.decide(context)).rejects.toThrow(/BLOCKED/);
+  it('parses a strict JSON decision from the mocked Meta client', async () => {
+    const decision = { kind: 'action', action: { type: 'click', target: 'Register' }, expected: 'Confirmation appears', rationale: 'Submit' };
+    const { client, create } = mockClient(JSON.stringify(decision));
+    const adapter: ReasoningAdapter = new MetaAdapter({ apiKey: 'test-key', client });
+    expect(await adapter.decide(context)).toEqual(decision);
+    expect(create).toHaveBeenCalledTimes(1);
+    const args = create.mock.calls[0][0];
+    expect(args.model).toBe('muse-spark-1.3');
+  });
+
+  it('attaches a screenshot as an image_url item when the file exists', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ghostqa-model-'));
+    const shot = join(dir, 'latest.png');
+    writeFileSync(shot, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const { client, create } = mockClient(JSON.stringify({ kind: 'stop', reason: 'Done' }));
+    const adapter = new MetaAdapter({ apiKey: 'test-key', client });
+    await adapter.decide({ ...context, observation: { ...context.observation, screenshotPath: shot } });
+    const parts = userContent(create);
+    expect(parts.some((part) => part.type === 'text' && part.text?.includes('<button>Register</button>'))).toBe(true);
+    const image = parts.find((part) => part.type === 'image_url');
+    expect(image?.image_url?.url.startsWith('data:image/png;base64,')).toBe(true);
+  });
+
+  it('falls back to text-only when the screenshot file is missing', async () => {
+    const { client, create } = mockClient(JSON.stringify({ kind: 'stop', reason: 'Done' }));
+    const adapter = new MetaAdapter({ apiKey: 'test-key', client });
+    await adapter.decide({ ...context, observation: { ...context.observation, screenshotPath: '/nonexistent/missing.png' } });
+    const parts = userContent(create);
+    expect(parts.some((part) => part.type === 'text' && part.text?.includes('<button>Register</button>'))).toBe(true);
+    expect(parts.some((part) => part.type === 'image_url')).toBe(false);
+  });
+
+  it('rejects malformed or oversized model output before any action', async () => {
+    const bad = mockClient('{not json');
+    await expect(new MetaAdapter({ apiKey: 'k', client: bad.client }).decide(context)).rejects.toThrow();
+    const oversized = mockClient('x'.repeat(8193));
+    await expect(new MetaAdapter({ apiKey: 'k', client: oversized.client }).decide(context)).rejects.toThrow(/too large/);
+    const unsafe = mockClient(JSON.stringify({ kind: 'action', action: { type: 'delete', target: 'account' }, expected: 'Gone', rationale: 'Delete' }));
+    await expect(new MetaAdapter({ apiKey: 'k', client: unsafe.client }).decide(context)).rejects.toThrow();
   });
 });

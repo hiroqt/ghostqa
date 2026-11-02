@@ -37,4 +37,31 @@ describe('GQ-001 URL policy', () => {
       expect.objectContaining({ code: 'ORIGIN_DENIED' }),
     );
   });
+
+  it('accepts a public origin only in live mode', () => {
+    const live = ['https://example.com'];
+    // Live mode off (default): a public origin is rejected as an unsafe allowlist entry.
+    expect(() => assertAllowedUrl('https://example.com/pricing', live)).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ALLOWLIST' }),
+    );
+    // Live mode on: the exact public origin is accepted and normalized.
+    expect(assertAllowedUrl('https://example.com/pricing', live, { liveMode: true })).toBe('https://example.com/pricing');
+    // A non-matching public origin is still denied in live mode.
+    expect(() => assertAllowedUrl('https://evil.test/pricing', live, { liveMode: true })).toThrowError(
+      expect.objectContaining({ code: 'ORIGIN_DENIED' }),
+    );
+  });
+
+  it('rejects unsafe schemes and credentials in live mode', () => {
+    const live = ['https://example.com'];
+    for (const url of ['file:///etc/passwd', 'data:text/html,x', 'javascript:alert(1)', 'https://user:pass@example.com/x']) {
+      expect(() => assertAllowedUrl(url, live, { liveMode: true })).toThrow(UrlPolicyError);
+    }
+    // Allowlist entries with a path/query or credentials remain invalid in live mode.
+    for (const origins of [['https://example.com/path'], ['https://example.com?x=1'], ['https://user:pass@example.com']]) {
+      expect(() => assertAllowedUrl('https://example.com/x', origins, { liveMode: true })).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ALLOWLIST' }),
+      );
+    }
+  });
 });

@@ -5,7 +5,7 @@ import type { Observation, ProposedAction } from './contracts';
 import { authorizeAction, executeAction, installNetworkGuard } from './executor';
 import { assertAllowedUrl } from './policy';
 
-type RunGate = { allowedOrigins: readonly string[]; actionCount: number; startedAt: number };
+type RunGate = { allowedOrigins: readonly string[]; actionCount: number; startedAt: number; liveMode?: boolean };
 
 export async function replayOnce(
   browser: Browser,
@@ -16,7 +16,7 @@ export async function replayOnce(
   onAction?: (action: ProposedAction, outcome: 'attempted' | 'completed' | 'failed') => void,
 ): Promise<{ before: Observation; after: Observation; replaySteps: ProposedAction[] }> {
   if (actions.length === 0) throw new Error('No action to replay');
-  const url = assertAllowedUrl(initialUrl, gate.allowedOrigins);
+  const url = assertAllowedUrl(initialUrl, gate.allowedOrigins, { liveMode: gate.liveMode });
   const navigation = authorizeAction({ type: 'navigate', value: url }, gate);
   if (gate.actionCount + actions.length >= 10) throw new Error('Replay exceeds action limit');
 
@@ -24,7 +24,7 @@ export async function replayOnce(
   const remaining = Math.max(1, 60_000 - (Date.now() - gate.startedAt));
   const timer = setTimeout(() => { void context.close().catch(() => {}); }, remaining);
   try {
-    await installNetworkGuard(context, gate.allowedOrigins);
+    await installNetworkGuard(context, gate.allowedOrigins, gate.liveMode);
     const page = await context.newPage();
     async function perform(action: ProposedAction) {
       onAction?.(action, 'attempted');

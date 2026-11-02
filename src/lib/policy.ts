@@ -5,7 +5,14 @@ export class UrlPolicyError extends Error {
   }
 }
 
-export function assertAllowedUrl(input: string, allowedOrigins: readonly string[]): string {
+export type UrlPolicyOptions = { liveMode?: boolean };
+
+export function assertAllowedUrl(
+  input: string,
+  allowedOrigins: readonly string[],
+  options: UrlPolicyOptions = {},
+): string {
+  const liveMode = options.liveMode === true;
   if (!Array.isArray(allowedOrigins) || allowedOrigins.length === 0) {
     throw new UrlPolicyError('INVALID_ALLOWLIST');
   }
@@ -17,10 +24,15 @@ export function assertAllowedUrl(input: string, allowedOrigins: readonly string[
     } catch {
       throw new UrlPolicyError('INVALID_ALLOWLIST');
     }
+    // The exact-origin allowlist concept holds in both modes: an entry must equal
+    // its own URL origin and carry no path, query, fragment, or user info. Live
+    // mode only widens the permitted host set from loopback to any public host.
     if (
       entry !== url.origin ||
       !['http:', 'https:'].includes(url.protocol) ||
-      !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+      url.username ||
+      url.password ||
+      (!liveMode && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
     ) {
       throw new UrlPolicyError('INVALID_ALLOWLIST');
     }
