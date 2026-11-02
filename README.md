@@ -1,23 +1,50 @@
-# GhostQA — 48-hour Agent Development Kit
+# GhostQA
 
-This repository is a **specification/configuration starter**, not a completed application. The scaffold contains intentional unimplemented gates; do not claim tests or live Meta integration pass yet.
+GhostQA tests one authorized local demo website, records a bounded browser trace, and reports a bug only after a repeatable observed failure. The MVP is a hackathon demonstration, not a general website scanner.
 
-## Reading order
-1. `AGENTS.md` — agent boundaries and process
-2. `docs/PRD.md` — requirements and acceptance
-3. `docs/ARD.md` — architecture and contracts
-4. `docs/SDD.md` — spec-first workflow
-5. `docs/TDD.md` — test-first workflow
-6. `docs/specs/` — feature-by-feature contracts
+## Run locally
 
-## First agent prompt
-"Read AGENTS.md and all docs. Do not implement yet. Audit requirements, identify blockers, and propose a five-step plan for GQ-001 only. Then write failing tests, implement minimal URL policy, run checks, and report exact outputs. Do not add features or claim the Meta API works without a verified smoke test."
+Requirements: Node.js 22, npm, and Playwright Chromium.
 
-## Bootstrap
-`npm install` then create the Next.js app source/config as the first implementation task. Copy `.env.example` to `.env` and use only synthetic fixture credentials. Install Playwright Chromium before E2E (`npx playwright install chromium`). Install Git pre-commit hook with `git config core.hooksPath .githooks`.
+```sh
+npm ci
+npx playwright install chromium
+cp .env.example .env
+node fixtures/demo/start.mjs
+```
 
-## Important
-`npm run check` and tests will not pass until app files/config/tests are implemented. CI uses `npm ci` and requires generating and committing `package-lock.json` after installing. Verify dependency versions and tool hook schema in your environment. The Meta smoke script intentionally fails closed.
+In another terminal, run `npm run dev`. Open `http://127.0.0.1:3000` and use `http://127.0.0.1:3001/register` for the seeded failure or `http://127.0.0.1:3001/health` for a healthy flow. The fixture uses synthetic data only. `ALLOWED_ORIGINS` in `.env` must list the exact local demo origin; the default is `http://127.0.0.1:3001`.
 
-## Hackathon integrity
-Build submitted code during event window; disclose third-party libraries and fixture. Keep repository public at submission; record demo video <=3 minutes. Do not commit secrets.
+## Checks
+
+```sh
+npm run check
+npm run test
+npm run build
+npm run test:e2e
+```
+
+E2E starts its own fixture and app servers on ports 3001 and 3000. Stop manually started servers first. GitHub Actions runs these checks on pushes and pull requests to `main`. Merge conflicts are shown by GitHub's PR mergeability check; GitHub does not start a `pull_request` workflow while a PR has conflicts. Resolve conflicts on the feature branch and rerun checks before manually merging. CI does not deploy or merge. This private repository's account cannot enable required checks without GitHub Pro, so the owner must inspect checks before each manual merge.
+
+## What this submission contains
+
+The initial commit is the PRD/ARD/SDD/TDD specification starter and repository policy. Implementation is developed during the hackathon on separate feature branches: local URL policy, browser observation and action guard, schema-validated reasoning adapter, outcome evaluation and replay, evidence report, UI, and synthetic demo fixture. Dependencies include Next.js, React, Playwright, Zod, Vitest, TypeScript, and ESLint; they are third-party software, not project-authored code. The broken registration endpoint is an intentional fixture, not a GhostQA-discovered production defect.
+
+The default reasoning mode is a deterministic mock. The Meta adapter fails closed because its current API contract and live credentials have not been verified. `npm run test:smoke:meta` intentionally reports that block. A mock run must not be presented as a real Meta-model test.
+
+## Safety and limits
+
+- One local allowlisted origin and Chromium browser per run, with a fresh context for the single replay; at most ten actions and sixty seconds including replay, and one finding.
+- No accounts, billing, deployment, external crawling, uploads, downloads, shell commands, arbitrary page JavaScript, or automatic fixes.
+- Synthetic fixture inputs only. Sensitive form fields are masked in screenshots and must be redacted from traces and reports. A model suggestion is a hypothesis until deterministic evidence and replay confirm it.
+- The demo result describes observed behavior and replay steps. It does not infer a backend root cause from a screenshot.
+- Local `npm audit --omit=dev` on 2026-11-02 reports a moderate Next.js advisory through PostCSS and high PostCSS advisories. Deployment is out of scope; review the supported upgrade path before any public hosting.
+
+## Three-minute demo outline
+
+1. **0:00–0:30:** Show the local fixture and exact allowlisted URL; explain the intentionally broken registration endpoint.
+2. **0:30–1:45:** Run the registration goal; show the live trace, HTTP failure evidence, and single replay-backed finding.
+3. **1:45–2:25:** Show the screenshot references, expected/actual result, and generated Playwright reproduction.
+4. **2:25–3:00:** Run `/health` for a no-finding outcome, then reject an external URL and disclose mock Meta mode.
+
+Read `docs/PRD.md`, `docs/ARD.md`, `docs/SDD.md`, `docs/TDD.md`, and `docs/specs/` for the requirement contracts. Do not commit `.env` or real credentials.

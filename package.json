@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "build": "next build",
     "check": "npm run typecheck && npm run lint",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
