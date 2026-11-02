@@ -34,7 +34,7 @@ export function authorizeAction(raw: unknown, gate: RunGate): ProposedAction {
       break;
     case 'press':
       if (!action.target || (!gate.liveMode && !['Email', 'Password'].includes(action.target)) ||
-          !['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown'].includes(action.value ?? '')) {
+        !['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown'].includes(action.value ?? '')) {
         throw new Error('Unsafe key');
       }
       break;
@@ -69,7 +69,7 @@ export async function installNetworkGuard(
         const method = route.request().method();
         const parsed = new URL(url);
         if (!['/', '/register', '/health', '/slop', '/slop.css', '/slop.js'].includes(parsed.pathname) || parsed.search ||
-            (!['GET', 'HEAD'].includes(method) && !(method === 'POST' && parsed.pathname === '/register'))) {
+          (!['GET', 'HEAD'].includes(method) && !(method === 'POST' && parsed.pathname === '/register'))) {
           throw new Error('Request method denied');
         }
       }
@@ -85,16 +85,47 @@ export async function executeAction(page: Page, action: ProposedAction): Promise
     case 'navigate':
       await page.goto(action.value!, { waitUntil: 'domcontentloaded' });
       break;
-    case 'click':
-      await page.getByRole('button', { name: action.target!, exact: true })
-        .or(page.getByRole('link', { name: action.target!, exact: true })).click();
+    case 'click': {
+      const exact = page.getByRole('button', { name: action.target!, exact: true })
+        .or(page.getByRole('link', { name: action.target!, exact: true }));
+      const candidate = exact.first ? exact.first() : exact;
+      if (candidate.count && (await candidate.count()) === 0) {
+        const fuzzy = page.getByRole('button', { name: action.target! })
+          .or(page.getByRole('link', { name: action.target! }));
+        await (fuzzy.first ? fuzzy.first() : fuzzy).click({ timeout: 4_000 });
+      } else {
+        await candidate.click({ timeout: 4_000 });
+      }
       break;
-    case 'fill':
-      await page.getByLabel(action.target!, { exact: true }).fill(action.value!);
+    }
+    case 'fill': {
+      const exact = page.getByLabel(action.target!, { exact: true });
+      const candidate = exact.first ? exact.first() : exact;
+      if (candidate.count && (await candidate.count()) === 0) {
+        const fuzzy = page.getByLabel(action.target!);
+        const fuzzyFirst = fuzzy.first ? fuzzy.first() : fuzzy;
+        if (fuzzyFirst.count && (await fuzzyFirst.count()) === 0 && page.getByPlaceholder) {
+          const placeholder = page.getByPlaceholder(action.target!);
+          await (placeholder.first ? placeholder.first() : placeholder).fill(action.value!, { timeout: 4_000 });
+        } else {
+          await fuzzyFirst.fill(action.value!, { timeout: 4_000 });
+        }
+      } else {
+        await candidate.fill(action.value!, { timeout: 4_000 });
+      }
       break;
-    case 'press':
-      await page.getByLabel(action.target!, { exact: true }).press(action.value!);
+    }
+    case 'press': {
+      const exact = page.getByLabel(action.target!, { exact: true });
+      const candidate = exact.first ? exact.first() : exact;
+      if (candidate.count && (await candidate.count()) === 0) {
+        const fuzzy = page.getByLabel(action.target!);
+        await (fuzzy.first ? fuzzy.first() : fuzzy).press(action.value!, { timeout: 4_000 });
+      } else {
+        await candidate.press(action.value!, { timeout: 4_000 });
+      }
       break;
+    }
     case 'scroll':
       await page.mouse.wheel(0, Number(action.value));
       break;

@@ -3,8 +3,43 @@ import { expect, test } from '@playwright/test';
 test('workspace layout keeps progress and content readable on desktop and mobile', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
+  await expect(page.locator('header')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Test workspace' })).toHaveCount(0);
+  const contentHeader = page.locator('.main-content').getByRole('region', { name: 'GhostQA overview' });
+  await expect(contentHeader).toBeVisible();
+  await expect(page.getByText('Idle · Guarded Chromium ready')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Replay intro' })).toHaveCount(0);
+  const tagline = contentHeader.getByRole('region', { name: 'Problem and solution tagline' });
+  await expect(tagline).toBeVisible();
+  await expect(tagline.locator('.tagline-problem strong')).toContainText(/AI-generated websites are everywhere/i);
+  await expect(tagline.locator('.tagline-solution strong')).toContainText(/GhostQA runs guarded Chromium checks/i);
+  const designDemo = contentHeader.getByRole('region', { name: 'Animated design and workflow verification demo' });
+  await expect(designDemo).toBeVisible();
+  await expect(designDemo.getByTestId('demo-web-navbar')).toBeVisible();
+  await expect(designDemo.getByTestId('demo-web-hero')).toBeVisible();
+  await expect(designDemo.getByTestId('demo-web-cards').locator('.demo-web-card')).toHaveCount(3);
+  const demoCursor = designDemo.getByTestId('demo-agent-cursor');
+  await expect(demoCursor).toBeVisible();
+  expect(await demoCursor.evaluate((node) => getComputedStyle(node).animationIterationCount)).toBe('infinite');
+  const jumpButton = contentHeader.getByRole('button', { name: 'Go to test workspace' });
+  await expect(jumpButton).toBeVisible();
+  await jumpButton.click();
   await expect(page.getByRole('heading', { name: 'Test workspace' })).toBeVisible();
+  await expect(page.getByLabel('Local demo URL')).toBeFocused();
   await expect(page.getByRole('complementary', { name: 'Run progress' })).toBeVisible();
+  await expect(page.locator('.app-header .mode')).toHaveCount(0);
+  await expect(page.locator('.sidebar-stage .stage-indicator svg')).toHaveCount(8);
+  const themeCheck = await page.evaluate(() => {
+    const rootFont = getComputedStyle(document.documentElement).fontFamily;
+    const mainBgImage = getComputedStyle(document.querySelector('.main-content')!).backgroundImage;
+    const panelRadius = parseFloat(getComputedStyle(document.querySelector('.panel')!).borderTopLeftRadius);
+    const inputRadius = parseFloat(getComputedStyle(document.querySelector('input')!).borderTopLeftRadius);
+    return { rootFont, mainBgImage, panelRadius, inputRadius };
+  });
+  expect(themeCheck.rootFont).toContain('Poppins');
+  expect(themeCheck.mainBgImage).not.toContain('gradient');
+  expect(themeCheck.panelRadius).toBeGreaterThanOrEqual(20);
+  expect(themeCheck.inputRadius).toBeGreaterThanOrEqual(12);
   const shellWidth = await page.locator('.shell').evaluate((node) => node.getBoundingClientRect().width);
   expect(shellWidth).toBeGreaterThan(900);
 
@@ -15,7 +50,13 @@ test('workspace layout keeps progress and content readable on desktop and mobile
 
 test('seeded registration failure is replayed and reported with evidence', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByRole('button', { name: 'Start test' }).click();
+  await expect(page.getByRole('dialog', { name: 'Live evaluation preview' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Evaluation stage progress' })).toBeVisible();
+  await expect(page.getByText('Where on the website')).toBeVisible();
+  await expect(page.getByText('What GhostQA is evaluating')).toBeVisible();
+  await expect(page.locator('.eval-step.active')).toContainText(/Observing|Reasoning|Executing|Evaluating|Replaying/);
   await expect(page.getByRole('status')).toHaveText('Complete', { timeout: 60_000 });
   await expect(page.getByText('verified', { exact: true })).toBeVisible();
   await expect(page.getByText('Registration complete', { exact: true })).toBeVisible();
@@ -46,6 +87,10 @@ test('masked page observation streams before the final result', async ({ request
 
 test('healthy demo flow has no fabricated finding', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Go to test workspace' }).click();
+  await expect(page.getByRole('group', { name: 'Common functional test goals' })).toBeVisible();
+  await page.getByRole('button', { name: 'Page health & console' }).click();
+  await expect(page.getByLabel('Goal (optional)')).toHaveValue('Verify the page renders its main heading cleanly with no HTTP or console errors');
   await page.getByLabel('Local demo URL').fill('http://127.0.0.1:3201/health');
   await page.getByLabel('Goal (optional)').fill('');
   await page.getByRole('button', { name: 'Start test' }).click();
@@ -57,8 +102,9 @@ test('healthy demo flow has no fabricated finding', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Playwright reproduction' })).toHaveCount(0);
 });
 
-test('AI slop review stamps only a six-observation story', async ({ page }) => {
+test('AI slop review stamps only a rendered-design verdict, with guideline cues as support', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Review type').selectOption('slop');
   await expect(page.getByLabel('Local demo URL')).toHaveValue('http://127.0.0.1:3201/slop');
   await page.getByRole('button', { name: 'Start test' }).click();
@@ -67,37 +113,46 @@ test('AI slop review stamps only a six-observation story', async ({ page }) => {
   await expect(page.locator('.slop-showcase')).toBeVisible({ timeout: 60_000 });
   expect(await page.locator('.slop-showcase .slop-stamp').evaluate((node) => getComputedStyle(node).animationName)).toBe('slop-stamp-in');
   await expect(page.locator('.slop-showcase .slop-stamp')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Findings story' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Design verdict' })).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.slop-showcase')).toHaveCount(0);
   await expect(page.locator('.slop-observation .slop-stamp')).toBeVisible();
   await expect(page.getByLabel('Live page observation')).toBeFocused();
-  await expect(page.getByText('23% of detectable patterns matched', { exact: false })).toBeVisible();
+  await expect(page.locator('.slop-verdict strong')).toHaveText('AI slop by design');
+  await expect(page.getByText('Design score 100/100 · high confidence')).toBeVisible();
   await expect(page.getByRole('link', { name: /Impeccable/i })).toHaveCount(0);
   const stamp = page.locator('.slop-observation .slop-stamp');
   expect(await stamp.evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   expect(await stamp.evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
-  await expect(page.getByRole('list', { name: 'AI slop observations' }).getByRole('listitem')).toHaveCount(8);
-  await expect(page.getByText('Patterns do not prove AI authorship.')).toBeVisible();
+  const observations = page.getByRole('list', { name: 'Rendered design observations' }).getByRole('listitem');
+  await expect(observations).toHaveCount(7);
+  await expect(observations.first()).toContainText('Violet-blue gradient canvas');
+  await expect(observations.first()).toContainText('Measured on the page');
+  await expect(page.getByText('Supporting guideline cues (8 of 35, 23%)')).toBeVisible();
+  await page.getByText('Supporting guideline cues (8 of 35, 23%)').click();
+  await expect(page.getByRole('list', { name: 'Supporting guideline cues' }).getByRole('listitem')).toHaveCount(8);
+  await expect(page.getByText('Neither proves AI authorship.', { exact: false })).toBeVisible();
   await page.getByText('Preview Markdown guide').click();
   await expect(page.locator('.slop-guide-preview pre')).toContainText('# GhostQA design review handoff');
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.getByRole('button', { name: 'Copy agent guide (Markdown)' }).click();
   await expect(page.getByText('Markdown guide copied')).toBeVisible();
   const guide = await page.evaluate(() => navigator.clipboard.readText());
-  expect(guide).toContain('# GhostQA design review handoff');
-  expect(guide).toContain('**Why review it:**');
+  expect(guide).toContain('**Verdict:** AI slop by design');
+  expect(guide.indexOf('## Rendered design observations')).toBeLessThan(guide.indexOf('## Supporting guideline cues'));
+  expect(guide).toContain('**Measured:**');
   expect(guide).not.toContain('sensitive-debug-value');
+  expect(guide).not.toContain('Automate anything');
 
   await page.getByLabel('Local demo URL').fill('http://127.0.0.1:3201/health');
   await page.getByRole('button', { name: 'Start test' }).click();
-  await expect(page.getByText('Insufficient evidence for a findings story')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText('0% of detectable patterns matched', { exact: false })).toBeVisible();
+  await expect(page.getByText('Insufficient evidence for a design verdict')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText('AI SLOP', { exact: true })).toHaveCount(0);
 });
 
 test('external URL is rejected before a browser run', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Local demo URL').fill('https://example.com');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('status')).toHaveText('Only the configured local demo URL is allowed');

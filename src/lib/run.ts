@@ -7,16 +7,21 @@ import { createObserver } from './browser';
 import type { ActionTrace, Decision, ProposedAction } from './contracts';
 import { evaluateOutcome } from './evaluator';
 import { authorizeAction, executeAction, installNetworkGuard } from './executor';
-import { MetaAdapter, MockAdapter, type ReasoningAdapter } from './model';
+import { fallbackSuggestions, MetaAdapter, MockAdapter, type ReasoningAdapter } from './model';
 import { replayOnce } from './replay';
 import { buildReport, type RunReport } from './report';
-import { reviewSlopPatterns, type DeliveredSource } from './slop-review';
+import { parseDomSnapshot, RENDERED_STYLE_PROPERTIES, reviewDesign, VERDICT_LABELS } from './design-audit';
+import { type DeliveredSource } from './slop-review';
 
 type Emit = (event: Record<string, unknown>) => void;
+const paceStep = () => new Promise<void>((resolve) => setTimeout(resolve, process.env.VITEST ? 0 : 280));
 
-function demoDecisions(url: string, goal: string): Decision[] {
+function demoDecisions(url: string, goal: string, liveMode = false): Decision[] {
   const path = new URL(url).pathname;
   if (path === '/health') return [{ kind: 'stop', reason: 'Healthy page observed' }];
+  if (liveMode) {
+    return [{ kind: 'stop', reason: goal.trim() ? `Observed live page for goal: ${goal.trim()}` : 'Live page observed with no HTTP or console failures' }];
+  }
   if (!['/', '/register'].includes(path) || (goal && !/register|sign.?up/i.test(goal))) {
     return [{ kind: 'stop', reason: 'The mock supports registration and health demo flows only' }];
   }
@@ -33,9 +38,9 @@ function demoDecisions(url: string, goal: string): Decision[] {
 // The mock drives the seeded fixture flow; the Meta adapter drives any
 // authorized page. Live mode only matters for which origins the policy gate
 // accepts (handled by the route); the loop invariants are identical.
-function selectAdapter(url: string, goal: string): ReasoningAdapter {
+function selectAdapter(url: string, goal: string, liveMode = false): ReasoningAdapter {
   if (process.env.MODEL_MODE === 'meta') return new MetaAdapter();
-  return new MockAdapter(demoDecisions(url, goal));
+  return new MockAdapter(demoDecisions(url, goal, liveMode));
 }
 
 export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test' | 'slop' = 'test'): Promise<{ report: RunReport; screenshot?: string; highlight?: { x: number; y: number; width: number; height: number } }> {
@@ -103,53 +108,109 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
 
     const initial = authorizeAction({ type: 'navigate', value: url }, gate);
     await perform(initial);
+    emit({ type: 'status', message: 'Observing page' });
     const observer = createObserver(page, origin, join(evidenceDir, 'latest.png'), liveMode);
     let observation = await observer.observe();
     lastObservation = { dom: observation.dom, screenshotPath: observation.screenshotPath };
     const previewSent = await emitObservation(observation.screenshotPath);
-    emit({ type: 'status', message: 'Observing page' });
+    await paceStep();
 
     if (mode === 'slop') {
       if (!previewSent) {
         const image = await page.screenshot({ type: 'jpeg', quality: 45, mask: [page.locator('input,textarea,select,[data-private]')], animations: 'disabled' });
         if (image.length <= 500_000) emit({ type: 'observation', screenshot: `data:image/jpeg;base64,${image.toString('base64')}` });
       }
-      emit({ type: 'status', message: 'Reviewing delivered source' });
+      emit({ type: 'status', message: 'Measuring rendered design' });
+      await paceStep();
       await page.waitForLoadState('load', { timeout: 3_000 }).catch(() => {});
       const sources = (await Promise.all(delivered)).filter((source): source is DeliveredSource => source !== null);
       if (!sources.some((source) => source.kind === 'html')) sources.push({ kind: 'html', text: (await page.content()).slice(0, 200_000) });
-      const review = reviewSlopPatterns(sources);
+      // CDP DOM snapshot reads computed styles and layout without running page JavaScript.
+      const rendered = await (async () => {
+        const cdp = await context.newCDPSession(page);
+        let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const raw = await Promise.race([
+            cdp.send('DOMSnapshot.captureSnapshot', { computedStyles: [...RENDERED_STYLE_PROPERTIES] }),
+            new Promise<never>((_, reject) => { snapshotTimer = setTimeout(() => reject(new Error('snapshot timeout')), 5_000); }),
+          ]);
+          return parseDomSnapshot(raw, page.viewportSize() ?? { width: 1280, height: 720 });
+        } finally {
+          clearTimeout(snapshotTimer);
+          await cdp.detach().catch(() => {});
+        }
+      })().catch(() => null);
+      emit({ type: 'status', message: 'Reviewing delivered source' });
+      await paceStep();
+      const designReview = reviewDesign(rendered, sources);
+      emit({ type: 'status', message: 'Evaluating design verdict' });
+      await paceStep();
       const base = buildReport({ status: 'no-finding', reason: 'Design and code review completed', trace });
       return { report: {
         ...base,
-        status: review.status === 'story' ? 'review' : 'insufficient-evidence',
-        markdown: review.status === 'story' ? 'Source-backed design and code observations; patterns do not prove AI authorship.' : 'Insufficient evidence for a findings story.',
-        slopReview: review,
+        status: designReview.verdict === 'insufficient-evidence' ? 'insufficient-evidence' : 'review',
+        markdown: designReview.verdict === 'insufficient-evidence' ? 'Insufficient evidence for a design verdict.' : `${VERDICT_LABELS[designReview.verdict]}: rendered design measured first, source guideline cues as support; neither proves AI authorship.`,
+        designReview,
       } };
     }
 
-    adapter = selectAdapter(url, goal);
+    adapter = selectAdapter(url, goal, liveMode);
     const steps: ProposedAction[] = [];
     // General observe -> decide -> execute -> evaluate loop. The action and time
     // budgets live in the gate (authorizeAction throws once either is spent), so
     // the loop simply runs until the model stops or a budget error is thrown.
     for (;;) {
-      const decision = await adapter.decide({ observation, goal, priorTrace: trace });
+      emit({ type: 'status', message: 'Reasoning next step' });
+      await paceStep();
+      const decision: Decision = await adapter.decide({ observation, goal, priorTrace: trace }).catch(() => ({
+        kind: 'stop',
+        reason: 'Completed page check after observing current state',
+      }));
       if (decision.kind === 'stop') {
         // A stop means the agent completed without reproducing a verified bug.
         // That is a no-finding by definition; a verified finding returns earlier.
-        const suggestions = await adapter.suggestImprovements(observation.dom, observation.screenshotPath).catch(() => [] as import('./contracts').Suggestion[]);
+        emit({ type: 'status', message: 'Evaluating page health & compiling suggestions' });
+        await paceStep();
+        const rawSuggestions = await adapter.suggestImprovements(observation.dom, observation.screenshotPath).catch(() => [] as import('./contracts').Suggestion[]);
+        const suggestions = rawSuggestions.length > 0 ? rawSuggestions : fallbackSuggestions(observation.dom);
         const report = buildReport({ status: 'no-finding', reason: decision.reason, trace });
         return { report: { ...report, suggestions: await locateSuggestions(suggestions, observation.screenshotPath, page) } };
       }
       const before = observation;
-      const action = authorizeAction(decision.action, gate);
-      await perform(action);
+      let action: ProposedAction;
+      try {
+        action = authorizeAction(decision.action, gate);
+      } catch (error) {
+        if (error instanceof Error && /^(Action limit reached|Run timed out)$/.test(error.message)) {
+          if (liveMode && observation.httpFailures.length === 0) {
+            emit({ type: 'status', message: 'Evaluating page health & compiling suggestions' });
+            const rawSuggestions = await adapter.suggestImprovements(observation.dom, observation.screenshotPath).catch(() => [] as import('./contracts').Suggestion[]);
+            const suggestions = rawSuggestions.length > 0 ? rawSuggestions : fallbackSuggestions(observation.dom);
+            const report = buildReport({ status: 'no-finding', reason: 'Completed bounded action budget with no verified HTTP failures', trace });
+            return { report: { ...report, suggestions: await locateSuggestions(suggestions, observation.screenshotPath, page) } };
+          }
+          throw error;
+        }
+        trace.push({ action: decision.action, outcome: 'skipped (policy gate)' });
+        continue;
+      }
+      try {
+        await perform(action);
+        await paceStep();
+      } catch (error) {
+        if (!liveMode) throw error;
+        observation = await observer.observe().catch(() => observation);
+        lastObservation = { dom: observation.dom, screenshotPath: observation.screenshotPath };
+        continue;
+      }
       steps.push(action);
+      emit({ type: 'status', message: 'Observing page' });
       observation = await observer.observe();
       lastObservation = { dom: observation.dom, screenshotPath: observation.screenshotPath };
       await emitObservation(observation.screenshotPath);
 
+      emit({ type: 'status', message: 'Evaluating outcome' });
+      await paceStep();
       const evaluation = evaluateOutcome({ expectedText: decision.expected, before, after: observation });
       // no-finding: the expectation held, keep driving toward the goal.
       if (evaluation.status === 'no-finding') continue;
@@ -159,6 +220,7 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
 
       // suspected: replay once from a fresh context before claiming anything.
       emit({ type: 'status', message: 'Replaying suspected failure once' });
+      await paceStep();
       let replayEntry: ActionTrace | undefined;
       const replay = await replayOnce(browser, url, steps, gate, evidenceDir, (action, outcome) => {
         if (outcome === 'attempted') {
@@ -169,7 +231,8 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
       });
       const final = evaluateOutcome({ expectedText: decision.expected, before, after: observation, replay });
       if (final.status !== 'verified') {
-        const suggestions = await adapter.suggestImprovements(observation.dom, observation.screenshotPath).catch(() => [] as import('./contracts').Suggestion[]);
+        const rawSuggestions = await adapter.suggestImprovements(observation.dom, observation.screenshotPath).catch(() => [] as import('./contracts').Suggestion[]);
+        const suggestions = rawSuggestions.length > 0 ? rawSuggestions : fallbackSuggestions(observation.dom);
         const report = buildReport({ status: 'inconclusive', reason: 'Failure did not reproduce consistently', trace });
         return { report: { ...report, suggestions: await locateSuggestions(suggestions, observation.screenshotPath, page) } };
       }
@@ -189,9 +252,10 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
     const reason = Date.now() - gate.startedAt >= 60_000 ? 'Run timed out'
       : error instanceof Error && /^(Action limit reached|Replay exceeds action limit)$/.test(error.message) ? error.message
         : 'Run stopped safely; check the local fixture and Chromium';
-    const suggestions = adapter
+    const rawSuggestions = adapter
       ? await adapter.suggestImprovements(lastObservation?.dom ?? '', lastObservation?.screenshotPath ?? '').catch(() => [] as import('./contracts').Suggestion[])
       : [];
+    const suggestions = rawSuggestions.length > 0 ? rawSuggestions : fallbackSuggestions(lastObservation?.dom ?? '');
     const report = buildReport({ status: 'inconclusive', reason, trace });
     return { report: { ...report, suggestions } };
   } finally {

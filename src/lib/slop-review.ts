@@ -36,14 +36,33 @@ export function buildSlopAgentGuide(review: SlopReview): string {
   ].join('\n');
 }
 
-type SkillCommand = 'animate' | 'clarify' | 'colorize' | 'distill' | 'harden' | 'layout' | 'polish' | 'quieter' | 'typeset';
-const skill = (command: SkillCommand) => ({
+export type SkillCommand = 'animate' | 'clarify' | 'colorize' | 'distill' | 'harden' | 'layout' | 'polish' | 'quieter' | 'typeset';
+export const skill = (command: SkillCommand) => ({
   name: `Impeccable ${command}`,
   url: `https://github.com/pbakaus/impeccable/blob/main/skill/reference/${command}.md`,
 });
 
 // These are review prompts backed by source signals, not an AI-authorship classifier.
+// The guideline catalog is supporting detail for the rendered-design audit in design-audit.ts.
 export function reviewSlopPatterns(sources: DeliveredSource[]): SlopReview {
+  const findings = matchSlopPatterns(sources);
+  const areaCount = Object.values(SLOP_AREAS).filter((ids) => findings.some((finding) => ids.includes(finding.id))).length;
+  return findings.length >= 6 && areaCount >= 3
+    ? { status: 'story', findings, matchedCount: findings.length }
+    : { status: 'insufficient-evidence', findings: [], matchedCount: findings.length };
+}
+
+const SLOP_AREAS = {
+  backgrounds: ['gradient', 'glass', 'repeating-stripes', 'gradient-text', 'decorative-grid', 'radial-halo', 'cream-palette', 'dark-neon'],
+  components: ['oversized-radius', 'repeated-cards', 'side-tab', 'hairline-shadow', 'icon-tile', 'nested-cards', 'hero-badge', 'placeholder-image'],
+  typography: ['overused-font', 'crushed-spacing', 'italic-serif-hero', 'label-above-heading', 'oversized-hero', 'flat-type', 'all-caps-body', 'numbered-label'],
+  motion: ['pulsing-status', 'auto-marquee', 'elastic-motion'],
+  copy: ['generic-claim', 'em-dash-overuse', 'forced-contrast', 'theater-copy'],
+  code: ['placeholder-link', 'important-overrides', 'debug-log', 'unfinished-marker'],
+};
+
+/** Every guideline cue matched in delivered source, without the story threshold. */
+export function matchSlopPatterns(sources: DeliveredSource[]): SlopFinding[] {
   const html = sources.filter((source) => source.kind === 'html').map((source) => source.text).join('\n').replace(/<!--[\s\S]*?-->/g, '');
   const css = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((match) => match[1])
     .concat(sources.filter((source) => source.kind === 'css').map((source) => source.text)).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -316,16 +335,5 @@ export function reviewSlopPatterns(sources: DeliveredSource[]): SlopReview {
     change: 'Use the intended image or remove the element.', skill: skill('harden'),
   });
 
-  const areas = {
-    backgrounds: ['gradient', 'glass', 'repeating-stripes', 'gradient-text', 'decorative-grid', 'radial-halo', 'cream-palette', 'dark-neon'],
-    components: ['oversized-radius', 'repeated-cards', 'side-tab', 'hairline-shadow', 'icon-tile', 'nested-cards', 'hero-badge', 'placeholder-image'],
-    typography: ['overused-font', 'crushed-spacing', 'italic-serif-hero', 'label-above-heading', 'oversized-hero', 'flat-type', 'all-caps-body', 'numbered-label'],
-    motion: ['pulsing-status', 'auto-marquee', 'elastic-motion'],
-    copy: ['generic-claim', 'em-dash-overuse', 'forced-contrast', 'theater-copy'],
-    code: ['placeholder-link', 'important-overrides', 'debug-log', 'unfinished-marker'],
-  };
-  const areaCount = Object.values(areas).filter((ids) => findings.some((finding) => ids.includes(finding.id))).length;
-  return findings.length >= 6 && areaCount >= 3
-    ? { status: 'story', findings, matchedCount: findings.length }
-    : { status: 'insufficient-evidence', findings: [], matchedCount: findings.length };
+  return findings;
 }
