@@ -34,7 +34,9 @@ export async function POST(request: Request): Promise<Response> {
       url = assertAllowedUrl(input.url, origins);
     }
   } catch {
-    const message = liveMode ? 'Only an allowlisted origin is allowed' : 'Only the configured local demo URL is allowed';
+    const message = liveMode
+      ? 'Enter a valid public URL (https://example.com). Private and internal addresses are not allowed.'
+      : 'Only the configured local demo URL is allowed';
     return Response.json({ error: message }, { status: 400 });
   }
   if (running) return Response.json({ error: 'A run is already active' }, { status: 409 });

@@ -5,9 +5,12 @@ import type { RunReport } from '../lib/report';
 import { readRunEvents } from '../lib/run-events';
 import './style.css';
 
+const liveMode = process.env.NEXT_PUBLIC_ALLOW_LIVE_SITES === 'true';
+const modelMode = process.env.NEXT_PUBLIC_MODEL_MODE ?? 'mock';
+
 export default function Home() {
-  const [url, setUrl] = useState('http://127.0.0.1:3001/register');
-  const [goal, setGoal] = useState('Try registering');
+  const [url, setUrl] = useState(liveMode ? '' : 'http://127.0.0.1:3001/register');
+  const [goal, setGoal] = useState(liveMode ? '' : 'Try registering');
   const [status, setStatus] = useState('Ready');
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<string[]>([]);
@@ -57,19 +60,37 @@ export default function Home() {
       <div className="eyebrow">LOCAL DEMO QA</div>
       <h1>GhostQA</h1>
       <p>One guarded browser run. One evidence-backed finding, or an honest inconclusive result.</p>
-      <span className="mode">Deterministic mock mode · live Meta integration unverified</span>
+      <span className="mode">
+        {liveMode && modelMode === 'meta'
+          ? 'Live mode · Meta Model API (Muse Spark)'
+          : liveMode
+            ? 'Live mode · mock reasoning'
+            : modelMode === 'meta'
+              ? 'Local demo · Meta Model API (Muse Spark)'
+              : 'Deterministic mock mode · live Meta integration unverified'}
+      </span>
     </header>
 
     <section className="panel" aria-labelledby="run-title">
       <h2 id="run-title">Start a run</h2>
       <form onSubmit={start}>
-        <label htmlFor="url">Local demo URL</label>
-        <input id="url" type="url" required value={url} onChange={(event) => setUrl(event.target.value)} disabled={running} />
+        <label htmlFor="url">{liveMode ? 'Website URL' : 'Local demo URL'}</label>
+        <input
+          id="url" type="url" required value={url}
+          placeholder={liveMode ? 'https://example.com' : 'http://127.0.0.1:3001/register'}
+          onChange={(event) => setUrl(event.target.value)} disabled={running}
+        />
         <label htmlFor="goal">Goal <span className="muted">(optional)</span></label>
-        <input id="goal" value={goal} onChange={(event) => setGoal(event.target.value)} disabled={running} />
+        <input
+          id="goal" value={goal}
+          placeholder={liveMode ? 'e.g. Find any broken links or CSS issues' : 'Try registering'}
+          onChange={(event) => setGoal(event.target.value)} disabled={running}
+        />
         <button type="submit" disabled={running}>{running ? 'Running…' : 'Start test'}</button>
       </form>
-      <p className="hint">Fixture: <code>http://127.0.0.1:3001/register</code> or <code>/health</code>. Use synthetic data only.</p>
+      {liveMode
+        ? <p className="hint">Enter any public URL. Private and internal addresses are blocked.</p>
+        : <p className="hint">Fixture: <code>http://127.0.0.1:3001/register</code> or <code>/health</code>. Use synthetic data only.</p>}
     </section>
 
     <section className="panel" aria-labelledby="trace-title">
