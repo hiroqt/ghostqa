@@ -12,6 +12,7 @@ export function parseDecision(raw: unknown): Decision {
 
 export interface ReasoningAdapter {
   decide(context: DecisionContext): Promise<Decision>;
+  suggestImprovements(dom: string, screenshotPath: string): Promise<string[]>;
 }
 
 export class MockAdapter implements ReasoningAdapter {
@@ -21,6 +22,15 @@ export class MockAdapter implements ReasoningAdapter {
 
   async decide(): Promise<Decision> {
     return parseDecision(this.decisions[this.index++] ?? { kind: 'stop', reason: 'Mock decisions exhausted' });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async suggestImprovements(_dom: string, _screenshotPath: string): Promise<string[]> {
+    return [
+      'Add ARIA landmark roles to major sections for better screen reader navigation',
+      'Ensure all images have descriptive alt attributes',
+      'Consider lazy-loading below-the-fold images to improve initial page load performance',
+    ];
   }
 }
 
@@ -67,6 +77,40 @@ export class MetaAdapter implements ReasoningAdapter {
     } else {
       if (!apiKey) throw new Error('BLOCKED: MODEL_API_KEY is required for the Meta Model API adapter');
       this.client = new OpenAI({ baseURL: options.baseURL ?? DEFAULT_BASE_URL, apiKey }) as unknown as ChatCompletionsClient;
+    }
+  }
+
+  async suggestImprovements(dom: string, screenshotPath: string): Promise<string[]> {
+    try {
+      const parts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+        {
+          type: 'text',
+          text: [
+            'You are a web quality advisor. Analyze the following sanitized DOM and screenshot.',
+            'Return a JSON array of 3 to 5 concise improvement suggestions covering UX, accessibility, performance patterns, and code structure.',
+            'Reply with ONLY a minified JSON array of strings, no prose, no markdown fences.',
+            'Example: ["Add aria-label to nav links","Ensure sufficient color contrast"]',
+            '',
+            `Sanitized DOM: ${dom.slice(0, 4000)}`,
+          ].join('\n'),
+        },
+      ];
+      try {
+        const bytes = await readFile(screenshotPath);
+        parts.push({ type: 'image_url', image_url: { url: `data:image/png;base64,${bytes.toString('base64')}` } });
+      } catch { /* no screenshot; proceed text-only */ }
+
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [{ role: 'user', content: parts }],
+      });
+      const content = response.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') return [];
+      const parsed: unknown = JSON.parse(content.trim());
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((s): s is string => typeof s === 'string').slice(0, 5);
+    } catch {
+      return [];
     }
   }
 

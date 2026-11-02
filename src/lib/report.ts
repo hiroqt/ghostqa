@@ -22,7 +22,7 @@ type Finding = {
   replaySteps: ProposedAction[];
   reproductionTest: string;
 };
-export type RunReport = { status: PlainOutcome['status'] | 'verified'; markdown: string; trace: SafeTrace[]; finding?: Finding };
+export type RunReport = { status: PlainOutcome['status'] | 'verified'; markdown: string; trace: SafeTrace[]; finding?: Finding; suggestions?: string[] };
 
 function cleanUrl(input: string): string {
   const url = new URL(input);
