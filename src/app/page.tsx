@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { RunReport } from '../lib/report';
 import { readRunEvents } from '../lib/run-events';
 import { FindingCard } from '../components/FindingCard';
 import { NoFindingState } from '../components/NoFindingState';
+import { SlopReviewStory } from '../components/SlopReviewStory';
 import './style.css';
 
 const liveMode = process.env.NEXT_PUBLIC_ALLOW_LIVE_SITES === 'true';
 const modelMode = process.env.NEXT_PUBLIC_MODEL_MODE ?? 'mock';
+const demoOrigin = process.env.NEXT_PUBLIC_DEMO_ORIGIN ?? 'http://127.0.0.1:3001';
 
 // ─── Stage definitions ────────────────────────────────────────────────────
 
@@ -54,15 +56,35 @@ function isAnimatingStage(stage: Stage): boolean {
 }
 
 export default function Home() {
-  const [url, setUrl] = useState(liveMode ? '' : 'http://127.0.0.1:3001/register');
+  const [url, setUrl] = useState(liveMode ? '' : `${demoOrigin}/register`);
   const [goal, setGoal] = useState(liveMode ? '' : 'Try registering');
+  const [reviewType, setReviewType] = useState<'test' | 'slop'>('test');
   const [status, setStatus] = useState('Ready');
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [report, setReport] = useState<RunReport | null>(null);
   const [screenshot, setScreenshot] = useState('');
+  const [preview, setPreview] = useState('');
+  const observationRef = useRef<HTMLElement>(null);
+  const [showSlopStory, setShowSlopStory] = useState(false);
+  const [slopShowcase, setSlopShowcase] = useState<'off' | 'stamp' | 'settling'>('off');
+  const [highlight, setHighlight] = useState<{ x: number; y: number; width: number; height: number }>();
   const [activeStage, setActiveStage] = useState<Stage>('Idle');
   const [completedStages, setCompletedStages] = useState<Set<Stage>>(new Set());
+
+  useEffect(() => {
+    if (report?.slopReview?.status === 'story' && (!preview || window.matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+      setShowSlopStory(true);
+      setSlopShowcase('off');
+    }
+  }, [report, preview]);
+
+  useEffect(() => {
+    if (report?.slopReview && preview && slopShowcase === 'off') {
+      observationRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
+      observationRef.current?.focus({ preventScroll: true });
+    }
+  }, [report, preview, slopShowcase]);
 
   function advanceStage(next: Stage) {
     setActiveStage((current) => {
@@ -87,6 +109,10 @@ export default function Home() {
     setLog([]);
     setReport(null);
     setScreenshot('');
+    setPreview('');
+    setShowSlopStory(false);
+    setSlopShowcase('off');
+    setHighlight(undefined);
     setActiveStage('Validating URL');
     setCompletedStages(new Set());
 
@@ -94,7 +120,7 @@ export default function Home() {
       const response = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url, goal }),
+        body: JSON.stringify({ url, goal, mode: reviewType }),
       });
       if (!response.ok) {
         const body: unknown = await response.json();
@@ -121,11 +147,18 @@ export default function Home() {
           const target = actionEvent.target ? ` ${actionEvent.target}` : '';
           setLog((previous) => [...previous, `${actionEvent.action}${target}`]);
           advanceStage('Executing');
+        } else if (event.type === 'observation' && 'screenshot' in event && typeof event.screenshot === 'string') {
+          setPreview(event.screenshot);
         } else if (event.type === 'done' && 'report' in event) {
-          setReport(event.report as RunReport);
+          const completedReport = event.report as RunReport;
+          setReport(completedReport);
+          if (completedReport.slopReview?.status === 'story') setSlopShowcase('stamp');
           setScreenshot(
             'screenshot' in event && typeof event.screenshot === 'string' ? event.screenshot : '',
           );
+          setHighlight('highlight' in event && event.highlight && typeof event.highlight === 'object'
+            ? event.highlight as { x: number; y: number; width: number; height: number }
+            : undefined);
           setStatus('Complete');
           setActiveStage('Report');
           setCompletedStages((prev) => {
@@ -150,14 +183,19 @@ export default function Home() {
 
   return (
     <div className="app-layout">
+      {running && reviewType === 'slop' && <div className="slop-loading" role="status" aria-live="polite"><span className="slop-loading-mark" aria-hidden="true">GQ</span><strong>Analyzing page design</strong><span>{status}</span></div>}
+      {slopShowcase !== 'off' && preview && <div className={`slop-showcase ${slopShowcase === 'settling' ? 'settling' : ''}`} aria-hidden="true" onTransitionEnd={(event) => { if (event.target === event.currentTarget && slopShowcase === 'settling') setSlopShowcase('off'); }}><div className="slop-showcase-frame"><img src={preview} alt="" /><span className="slop-stamp" onAnimationEnd={() => { setShowSlopStory(true); setSlopShowcase('settling'); }}>AI SLOP</span></div></div>}
       {/* ─── Top header ─────────────────────────────────────────────── */}
       <header className="app-header">
-        <div>
-          <div className="eyebrow">LOCAL DEMO QA</div>
+        <div className="brand-mark" aria-hidden="true">G<span>Q</span></div>
+        <div className="brand-copy">
           <h1>GhostQA</h1>
+          <span>Local website testing</span>
         </div>
         <span className="mode">
-          {liveMode && modelMode === 'meta'
+          {reviewType === 'slop'
+            ? liveMode ? 'Live mode · source pattern review' : 'Local demo · source pattern review'
+            : liveMode && modelMode === 'meta'
             ? 'Live mode · Meta Model API'
             : liveMode
               ? 'Live mode · mock reasoning'
@@ -176,9 +214,17 @@ export default function Home() {
       </div>
 
       {/* ─── Sidebar ────────────────────────────────────────────────── */}
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Run progress">
+        <div className="sidebar-overview">
+          <div className="sidebar-title">Current run</div>
+          <strong>{activeStage === 'Idle' ? 'Ready to test' : activeStage}</strong>
+          <span>{activeIndex} of {ALL_STAGES.length - 1} stages</span>
+          <div className="progress-bar-wrap" aria-hidden="true">
+            <div className="progress-bar-fill" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
         <div className="sidebar-title">Run stages</div>
-        <nav aria-label="Run stages">
+        <div>
           <ul className="sidebar-stages" role="list">
             {ALL_STAGES.map((stage) => {
               const isActive = stage === activeStage;
@@ -201,16 +247,35 @@ export default function Home() {
               );
             })}
           </ul>
-        </nav>
+        </div>
+        <div className="sidebar-note">One site · One bounded run</div>
       </aside>
 
       {/* ─── Main content ───────────────────────────────────────────── */}
       <main className="main-content" id="main-content">
         <div className="shell">
+          <div className="workspace-intro">
+            <div>
+              <div className="eyebrow">TEST CONSOLE</div>
+              <h2>Test workspace</h2>
+              <p>Run a focused check and follow each browser action as it happens.</p>
+            </div>
+            <span className="workspace-limit">One site · 10 actions max</span>
+          </div>
+          <div className="workspace-grid">
           {/* ─── Start a run ──────────────────────────────────────── */}
-          <section className="panel" aria-labelledby="run-title">
+          <section className="panel run-panel" aria-labelledby="run-title">
             <h2 id="run-title">Start a run</h2>
             <form onSubmit={start}>
+              <label htmlFor="review-type">Review type</label>
+              <select id="review-type" value={reviewType} onChange={(event) => {
+                const next = event.target.value as 'test' | 'slop';
+                if (!liveMode && url === `${demoOrigin}/${reviewType === 'test' ? 'register' : 'slop'}`) setUrl(`${demoOrigin}/${next === 'test' ? 'register' : 'slop'}`);
+                setReviewType(next);
+              }} disabled={running}>
+                <option value="test">Functional test</option>
+                <option value="slop">AI slop design and code review</option>
+              </select>
               <label htmlFor="url">{liveMode ? 'Website URL' : 'Local demo URL'}</label>
               <input
                 id="url"
@@ -218,34 +283,36 @@ export default function Home() {
                 required
                 value={url}
                 placeholder={
-                  liveMode ? 'https://example.com' : 'http://127.0.0.1:3001/register'
+                  liveMode ? 'https://example.com' : `${demoOrigin}/${reviewType === 'slop' ? 'slop' : 'register'}`
                 }
                 onChange={(event) => setUrl(event.target.value)}
                 disabled={running}
               />
-              <label htmlFor="goal">
-                Goal <span className="muted">(optional)</span>
-              </label>
-              <input
-                id="goal"
-                value={goal}
-                placeholder={
-                  liveMode ? 'e.g. Find any broken links or CSS issues' : 'Try registering'
-                }
-                onChange={(event) => setGoal(event.target.value)}
-                disabled={running}
-              />
+              {reviewType === 'test' && <>
+                <label htmlFor="goal">
+                  Goal <span className="muted">(optional)</span>
+                </label>
+                <input
+                  id="goal"
+                  value={goal}
+                  placeholder={
+                    liveMode ? 'e.g. Find any broken links or CSS issues' : 'Try registering'
+                  }
+                  onChange={(event) => setGoal(event.target.value)}
+                  disabled={running}
+                />
+              </>}
               <button type="submit" disabled={running}>
                 {running ? 'Running…' : 'Start test'}
               </button>
             </form>
             {liveMode ? (
               <p className="hint">
-                Enter any public URL. Private and internal addresses are blocked.
+                Enter a public URL. Private and internal addresses are blocked; review stays on one origin.
               </p>
             ) : (
               <p className="hint">
-                Fixture: <code>http://127.0.0.1:3001/register</code> or <code>/health</code>. Use
+                Fixture: <code>{demoOrigin}/register</code>, <code>/health</code>, or <code>/slop</code>. Use
                 synthetic data only.
               </p>
             )}
@@ -253,7 +320,7 @@ export default function Home() {
 
           {/* ─── Run trace ────────────────────────────────────────── */}
           <section
-            className={`panel ${activeStage === 'Observing' ? 'observing' : ''}`}
+            className={`panel trace-panel ${activeStage === 'Observing' ? 'observing' : ''}`}
             aria-labelledby="trace-title"
           >
             <div className="section-head">
@@ -264,7 +331,7 @@ export default function Home() {
                 className={`run-status ${running && isAnimatingStage(activeStage) ? '' : running ? '' : activeStage === 'Report' ? 'complete' : 'idle'}`}
               >
                 <span>{status}</span>
-                {running && <span className="animated-ellipsis" aria-hidden="true" />}
+                {running && <span className="loading-spinner" aria-hidden="true" />}
               </span>
             </div>
             {log.length > 0 ? (
@@ -277,17 +344,33 @@ export default function Home() {
               <p className="muted">Actions will appear here as they run.</p>
             )}
           </section>
+          </div>
+
+          {preview && (!running || reviewType !== 'slop') && (
+            <section ref={observationRef} tabIndex={-1} className={`panel ${reviewType === 'slop' ? 'slop-observation' : ''}`} aria-label="Live page observation">
+              <div className="section-head">
+                <h2>Page observation</h2>
+                <span className="muted">{running ? 'Updating during validation' : 'Last observed page'}</span>
+              </div>
+              <div className="slop-preview">
+                <img className="observation-image" src={preview} alt="Latest masked browser observation" />
+                {report?.slopReview?.status === 'story' && <span className="slop-stamp" aria-label="AI slop pattern review">AI SLOP</span>}
+              </div>
+            </section>
+          )}
 
           {/* ─── Result ───────────────────────────────────────────── */}
-          {report && (
+          {report && (report.slopReview?.status !== 'story' || showSlopStory) && (
             <section className="panel" aria-labelledby="result-title">
               <div className="section-head">
                 <h2 id="result-title">Result</h2>
                 <strong className={`outcome ${report.status}`}>{report.status}</strong>
               </div>
 
-              {report.finding ? (
-                <FindingCard finding={report.finding} screenshot={screenshot} />
+              {report.slopReview ? (
+                <SlopReviewStory review={report.slopReview} />
+              ) : report.finding ? (
+                <FindingCard finding={report.finding} screenshot={screenshot} highlight={highlight} />
               ) : (
                 <NoFindingState
                   status={report.status as 'no-finding' | 'inconclusive'}

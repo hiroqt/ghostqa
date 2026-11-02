@@ -32,3 +32,44 @@ test('aborts cross-origin redirects and unapproved local requests', async () => 
   }
   expect(outcomes).toEqual(['aborted', 'aborted']);
 });
+
+test('fixture assets are readable but other paths and writes stay denied', async () => {
+  expect(authorizeAction({ type: 'navigate', value: 'http://127.0.0.1:3001/slop' }, state).type).toBe('navigate');
+  expect(() => authorizeAction({ type: 'navigate', value: 'http://127.0.0.1:3001/custom' }, state)).toThrow('Navigation path denied');
+  let guard: ((route: Route) => Promise<void>) | undefined;
+  const context = { route: async (_pattern: string, callback: (route: Route) => Promise<void>) => { guard = callback; } } as unknown as BrowserContext;
+  await installNetworkGuard(context, state.allowedOrigins);
+  if (!guard) throw new Error('Network guard was not installed');
+  const outcomes: string[] = [];
+  for (const [url, method] of [
+    ['http://127.0.0.1:3001/slop.css', 'GET'],
+    ['http://127.0.0.1:3001/slop.js', 'GET'],
+    ['http://127.0.0.1:3001/custom', 'GET'],
+    ['http://127.0.0.1:3001/slop.js', 'POST'],
+    ['https://example.com/app.js', 'GET'],
+  ]) await guard({
+    request: () => ({ url: () => url, method: () => method }),
+    continue: async () => { outcomes.push('continued'); },
+    abort: async () => { outcomes.push('aborted'); },
+  } as unknown as Route);
+  expect(outcomes).toEqual(['continued', 'continued', 'aborted', 'aborted', 'aborted']);
+});
+
+test('live review allows same-origin reads and blocks writes and cross-origin requests', async () => {
+  let guard: ((route: Route) => Promise<void>) | undefined;
+  const context = { route: async (_pattern: string, callback: (route: Route) => Promise<void>) => { guard = callback; } } as unknown as BrowserContext;
+  await installNetworkGuard(context, ['https://example.com'], true, true);
+  if (!guard) throw new Error('Network guard was not installed');
+  const outcomes: string[] = [];
+  for (const [url, method] of [
+    ['https://example.com/', 'GET'],
+    ['https://example.com/app.css', 'HEAD'],
+    ['https://example.com/api/submit', 'POST'],
+    ['https://other.example/app.js', 'GET'],
+  ]) await guard({
+    request: () => ({ url: () => url, method: () => method }),
+    continue: async () => { outcomes.push('continued'); },
+    abort: async () => { outcomes.push('aborted'); },
+  } as unknown as Route);
+  expect(outcomes).toEqual(['continued', 'continued', 'aborted', 'aborted']);
+});

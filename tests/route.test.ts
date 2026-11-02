@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 // Mock the run loop so route tests exercise URL policy + allowlist wiring only,
 // never launching a real browser against a public origin.
-const runDemo = vi.fn(async (_url: string, _goal: string, emit: (event: Record<string, unknown>) => void) => {
+const runDemo = vi.fn(async (_url: string, _goal: string, emit: (event: Record<string, unknown>) => void, _mode?: 'test' | 'slop') => {
+  void _mode;
   emit({ type: 'done', report: { status: 'no-finding' } });
   return { report: { status: 'no-finding' } } as never;
 });
@@ -45,7 +46,7 @@ test('live mode accepts a public origin without ALLOWED_ORIGINS set', async () =
   delete process.env.ALLOWED_ORIGINS;
   const response = await POST(makeRequest({ url: 'https://example.com/pricing' }));
   expect(response.status).toBe(200);
-  expect(runDemo).toHaveBeenCalledWith('https://example.com/pricing', '', expect.any(Function));
+  expect(runDemo).toHaveBeenCalledWith('https://example.com/pricing', '', expect.any(Function), 'test');
   await drain(response);
 });
 
@@ -79,6 +80,29 @@ test('live mode off still requires and uses ALLOWED_ORIGINS loopback default', a
   delete process.env.ALLOWED_ORIGINS;
   const ok = await POST(makeRequest({ url: 'http://127.0.0.1:3001/register' }));
   expect(ok.status).toBe(200);
-  expect(runDemo).toHaveBeenCalledWith('http://127.0.0.1:3001/register', '', expect.any(Function));
+  expect(runDemo).toHaveBeenCalledWith('http://127.0.0.1:3001/register', '', expect.any(Function), 'test');
   await drain(ok);
+});
+
+test('routes only the selected review mode to the run controller', async () => {
+  const response = await POST(makeRequest({ url: 'http://127.0.0.1:3001/slop', mode: 'slop' }));
+  expect(response.status).toBe(200);
+  expect(runDemo).toHaveBeenCalledWith('http://127.0.0.1:3001/slop', '', expect.any(Function), 'slop');
+  await drain(response);
+  runDemo.mockClear();
+  const invalid = await POST(makeRequest({ url: 'http://127.0.0.1:3001/slop', mode: 'unknown' }));
+  expect(invalid.status).toBe(400);
+  expect(runDemo).not.toHaveBeenCalled();
+});
+
+test('slop review admits a public URL only in live mode', async () => {
+  process.env.ALLOW_LIVE_SITES = 'true';
+  const response = await POST(makeRequest({ url: 'https://example.com/', mode: 'slop' }));
+  expect(response.status).toBe(200);
+  expect(runDemo).toHaveBeenCalledWith('https://example.com/', '', expect.any(Function), 'slop');
+  await drain(response);
+  runDemo.mockClear();
+  const privateResponse = await POST(makeRequest({ url: 'http://127.0.0.1:8080/', mode: 'slop' }));
+  expect(privateResponse.status).toBe(400);
+  expect(runDemo).not.toHaveBeenCalled();
 });
