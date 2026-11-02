@@ -20,6 +20,7 @@ In another terminal, run `npm run dev`. Open `http://127.0.0.1:3000` and use `ht
 ```sh
 npm run check
 npm run test
+npm run build
 npm run test:e2e
 ```
 
@@ -33,7 +34,7 @@ The default reasoning mode is a deterministic mock. The Meta adapter fails close
 
 ## Safety and limits
 
-- One local allowlisted origin, one Chromium context, at most ten actions, sixty seconds per run, one replay, and one finding.
+- One local allowlisted origin and Chromium browser per run, with a fresh context for the single replay; at most ten actions and sixty seconds including replay, and one finding.
 - No accounts, billing, deployment, external crawling, uploads, downloads, shell commands, arbitrary page JavaScript, or automatic fixes.
 - Synthetic fixture inputs only. Sensitive form fields are masked in screenshots and must be redacted from traces and reports. A model suggestion is a hypothesis until deterministic evidence and replay confirm it.
 - The demo result describes observed behavior and replay steps. It does not infer a backend root cause from a screenshot.
