@@ -60,7 +60,9 @@ export function createObserver(page: Page, allowedOrigin: string, screenshotPath
       }
       const visibleHeadings: string[] = [];
       for (const locator of headings.slice(0, 5)) {
-        try { visibleHeadings.push(clean((await locator.textContent({ timeout: 500 })) ?? '')); }
+        try {
+          if (await locator.isVisible()) visibleHeadings.push(clean((await locator.textContent({ timeout: 500 })) ?? ''));
+        }
         catch { /* A detached heading is absent from this observation. */ }
       }
       await mkdir(dirname(screenshotPath), { recursive: true });

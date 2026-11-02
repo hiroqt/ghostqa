@@ -5,7 +5,7 @@ Goal: provide bounded, redacted evidence from one authorized demo page.
 Inputs and types: a Playwright `Page`, exact allowed origin, and screenshot path.
 Outputs and types: `Observation` with screenshot reference, compact DOM controls, console errors, and same-origin HTTP failures.
 Preconditions: caller has checked the URL against GQ-001 and opened the page in the guarded browser context.
-Invariants / security: do not read form values, cookies, response bodies, or raw page HTML; mask sensitive controls in screenshots; remove query strings and redact common secret/email patterns from strings; bound controls and errors; disregard other-origin network responses.
+Invariants / security: do not read form values, cookies, response bodies, or raw page HTML; include only visible headings in outcome evidence; mask sensitive controls in screenshots; remove query strings and redact common secret/email patterns from strings; bound controls and errors; disregard other-origin network responses.
 Happy-path example: `/register` yields labeled email/password controls and a submit button with no entered values.
 Failure-path example: a same-origin 500 response is recorded with path and status; a token query parameter is omitted.
 Acceptance criteria (Given/When/Then):

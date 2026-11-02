@@ -24,7 +24,7 @@ npm run build
 npm run test:e2e
 ```
 
-E2E starts its own fixture and app servers on ports 3001 and 3000. Stop manually started servers first. GitHub Actions runs these checks on pushes and pull requests to `main`. Merge conflicts are shown by GitHub's PR mergeability check; GitHub does not start a `pull_request` workflow while a PR has conflicts. Resolve conflicts on the feature branch and rerun checks before manually merging. CI does not deploy or merge.
+E2E starts its own fixture and app servers on ports 3001 and 3000. Stop manually started servers first. GitHub Actions runs these checks on pushes and pull requests to `main`. Merge conflicts are shown by GitHub's PR mergeability check; GitHub does not start a `pull_request` workflow while a PR has conflicts. Resolve conflicts on the feature branch and rerun checks before manually merging. CI does not deploy or merge. This private repository's account cannot enable required checks without GitHub Pro, so the owner must inspect checks before each manual merge.
 
 ## What this submission contains
 
@@ -38,6 +38,7 @@ The default reasoning mode is a deterministic mock. The Meta adapter fails close
 - No accounts, billing, deployment, external crawling, uploads, downloads, shell commands, arbitrary page JavaScript, or automatic fixes.
 - Synthetic fixture inputs only. Sensitive form fields are masked in screenshots and must be redacted from traces and reports. A model suggestion is a hypothesis until deterministic evidence and replay confirm it.
 - The demo result describes observed behavior and replay steps. It does not infer a backend root cause from a screenshot.
+- Local `npm audit --omit=dev` on 2026-11-02 reports a moderate Next.js advisory through PostCSS and high PostCSS advisories. Deployment is out of scope; review the supported upgrade path before any public hosting.
 
 ## Three-minute demo outline
 

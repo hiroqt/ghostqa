@@ -16,7 +16,7 @@ function fakeBrowser(failClick = false) {
     },
     goto: async (url: string) => { currentUrl = url; },
     locator: (selector: string) => ({
-      all: async () => selector === 'h1,h2,h3' ? [{ textContent: async () => heading }] : [],
+      all: async () => selector === 'h1,h2,h3' ? [{ textContent: async () => heading, isVisible: async () => true }] : [],
     }),
     screenshot: async () => {},
     getByLabel: (label: string) => ({ fill: async (value: string) => { inputs.push(`${label}:${value}`); } }),

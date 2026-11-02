@@ -2,19 +2,20 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Page } from 'playwright';
 import { createObserver } from '../src/lib/browser';
 
-function fakePage(pageUrl = 'http://127.0.0.1:3001/register') {
+function fakePage(pageUrl = 'http://127.0.0.1:3001/register', hiddenSuccess = false) {
   const listeners: Record<string, (value: unknown) => void> = {};
   const mask = { marker: 'masked controls' };
   const screenshot = vi.fn(async () => Buffer.from('synthetic screenshot'));
-  const control = (attrs: Record<string, string>, text = '') => ({
+  const control = (attrs: Record<string, string>, text = '', visible = true) => ({
     getAttribute: vi.fn(async (name: string) => attrs[name] ?? null),
     textContent: vi.fn(async () => text),
+    isVisible: vi.fn(async () => visible),
   });
   const page = {
     on: (event: string, callback: (value: unknown) => void) => { listeners[event] = callback; },
     url: () => pageUrl,
     locator: (selector: string) => selector === 'h1,h2,h3'
-      ? { all: async () => [control({}, 'Registration failed')] }
+      ? { all: async () => hiddenSuccess ? [control({}, 'Registration complete', false), control({}, 'Registration failed')] : [control({}, 'Registration failed')] }
       : selector === 'a,button,label'
         ? { all: async () => [control({}, 'Create account')] }
         : selector === 'input,select,textarea'
@@ -34,6 +35,12 @@ describe('GQ-002 browser observer', () => {
     expect(observation.dom).toContain('Create account');
     expect(observation.dom).toContain('Email');
     expect(observation.dom).not.toContain('private@example.test');
+  });
+
+  it('ignores a hidden success heading when observing failure', async () => {
+    const { page } = fakePage('http://127.0.0.1:3001/register', true);
+    const observation = await createObserver(page, 'http://127.0.0.1:3001', '/tmp/ghostqa-hidden.png').observe();
+    expect(JSON.parse(observation.dom).headings).toEqual(['Registration failed']);
   });
 
   it('redacts console errors and records only same-origin HTTP failure paths', async () => {

@@ -51,7 +51,9 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
 
     const initial = authorizeAction({ type: 'navigate', value: url }, gate);
     gate.actionCount++;
+    emit({ type: 'action', action: 'navigate', target: url });
     await executeAction(page, initial);
+    trace.push({ action: initial, outcome: 'initial navigation completed' });
     const observer = createObserver(page, origin, join(evidenceDir, 'latest.png'));
     let observation = await observer.observe();
     emit({ type: 'status', message: 'Observing local page' });
@@ -82,6 +84,10 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
       }
       emit({ type: 'status', message: 'Replaying suspected failure once' });
       const replay = await replayOnce(browser, url, steps, gate, evidenceDir);
+      for (const action of replay.replaySteps) {
+        trace.push({ action, outcome: 'replay completed' });
+        emit({ type: 'action', action: `replay ${action.type}`, target: action.target ?? (action.type === 'navigate' ? action.value : '') });
+      }
       const final = evaluateOutcome({ expectedText: decision.expected, before, after: observation, replay });
       if (final.status !== 'verified') {
         return { report: buildReport({ status: 'inconclusive', reason: 'Failure did not reproduce consistently', trace }) };

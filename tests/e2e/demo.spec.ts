@@ -9,6 +9,8 @@ test('seeded registration failure is replayed and reported with evidence', async
   await expect(page.getByText('Registration failed', { exact: true })).toBeVisible();
   await expect(page.getByAltText('Masked browser screenshot of the verified failure')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Playwright reproduction' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Replay steps' })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'replay navigate' })).toBeVisible();
   await expect(page.getByText('synthetic-password')).toHaveCount(0);
 });
 

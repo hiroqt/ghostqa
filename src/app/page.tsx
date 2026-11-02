@@ -84,6 +84,10 @@ export default function Home() {
         {screenshot && <img className="evidence" src={screenshot} alt="Masked browser screenshot of the verified failure" />}
         <h3>HTTP evidence</h3><ul>{report.finding.httpFailures.map((item, index) => <li key={index}>{item.status} {item.url}</li>)}</ul>
         <h3>Console evidence</h3><p>{report.finding.consoleErrors.join('; ') || 'No console errors recorded'}</p>
+        <h3>Replay steps</h3>
+        <ol>{report.finding.replaySteps.map((action, index) => <li key={index}>
+          {action.type} {action.target ?? (action.type === 'navigate' ? action.value : '')}
+        </li>)}</ol>
         <h3>Playwright reproduction</h3><pre><code>{report.finding.reproductionTest}</code></pre>
       </> : <p>{report.markdown}</p>}
     </section>}

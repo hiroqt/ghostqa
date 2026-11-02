@@ -9,7 +9,7 @@ Preconditions: one configured local demo origin; mock model mode clearly disclos
 Invariants / security: validate URL before launching Chromium; at most one run at a time; ten actions and sixty seconds including replay; server-only browser/model access; no credentials/client secrets; all browser resources close at terminal state.
 Happy-path example: testing `/register` with a registration goal streams fill/click actions and a replay-confirmed seeded failure.
 Failure-path example: external URL gets HTTP 400 without browser launch; unsupported goal is inconclusive; `/health` returns no finding.
-Acceptance criteria (Given/When/Then): Given a local URL, when Start is selected, then status and action log update before the terminal report. Given a verified failure, then show expected/actual, screenshot, evidence and repro test. Given no finding, then show no bug claim. Given external URL, then reject before launch.
+Acceptance criteria (Given/When/Then): Given a local URL, when Start is selected, then status and action log update before the terminal report, including initial navigation and replay actions. Given a verified failure, then show expected/actual, screenshot, evidence, replay steps and repro test. Given no finding, then show no bug claim. Given external URL, then reject before launch.
 Unit test names: `tests/route.test.ts` verifies request boundary rejection and no-launch behavior.
 Integration/E2E test names: seeded registration, healthy flow, and rejected URL tests after all implementation is complete.
 Out of scope: accounts, stored runs, arbitrary sites, deployment, multi-run analytics.

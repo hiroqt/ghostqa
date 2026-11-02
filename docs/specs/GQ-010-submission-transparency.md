@@ -13,4 +13,4 @@ Acceptance criteria (Given/When/Then): Given a PR targeting main, when it is ope
 Unit test names: none; workflow syntax and local commands are checked as configuration.
 Integration/E2E test names: PR workflow run after push; `npm run test:e2e` after all implementation is complete.
 Out of scope: deployment, cloud browser workers, automatic merging, publishing the repository, and real Meta model claims.
-Open questions: GitHub account plan may limit branch protection enforcement on private repositories.
+Open questions: none. GitHub rejected branch protection for this private repository with HTTP 403 (upgrade to GitHub Pro or make it public); the owner chose to keep it private, so required checks cannot be enforced on `main` in this account.
