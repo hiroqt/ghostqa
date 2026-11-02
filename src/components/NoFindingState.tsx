@@ -1,10 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import FlashIcon from '@hugeicons/core-free-icons/FlashIcon';
+import Shield01Icon from '@hugeicons/core-free-icons/Shield01Icon';
+import ShieldCheckIcon from '@hugeicons/core-free-icons/ShieldCheckIcon';
+import SparklesIcon from '@hugeicons/core-free-icons/SparklesIcon';
+import Structure01Icon from '@hugeicons/core-free-icons/Structure01Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
+import UniversalAccessIcon from '@hugeicons/core-free-icons/UniversalAccessIcon';
+import ViewIcon from '@hugeicons/core-free-icons/ViewIcon';
+import Wrench01Icon from '@hugeicons/core-free-icons/Wrench01Icon';
 import type { Suggestion } from '../lib/contracts';
 
 interface NoFindingStateProps {
   status: 'no-finding' | 'inconclusive';
+  reason?: string;
   suggestions: Suggestion[];
 }
 
@@ -36,7 +47,7 @@ function SuggestionRow({ suggestion, index }: { suggestion: Suggestion; index: n
       {/* Category badge + location chip on one line */}
       <div className="suggestion-meta">
         <span className={`suggestion-category-badge category-${categories.slug}`} aria-label={`Category: ${categories.label}`}>
-          {categories.icon} {categories.label}
+          <HugeiconsIcon icon={categories.icon} size={13} strokeWidth={2} aria-hidden="true" /> {categories.label}
         </span>
         <LocationChip location={suggestion.location} />
       </div>
@@ -56,7 +67,10 @@ function SuggestionRow({ suggestion, index }: { suggestion: Suggestion; index: n
 
       {suggestion.image && suggestion.bounds && (
         <div className="suggestion-location-view">
-          <button type="button" className="suggestion-code-toggle" aria-expanded={showLocation} onClick={() => setShowLocation(!showLocation)}>{showLocation ? 'Hide location' : 'Show on page'}</button>
+          <button type="button" className="suggestion-code-toggle" aria-expanded={showLocation} onClick={() => setShowLocation(!showLocation)}>
+            <HugeiconsIcon icon={ViewIcon} size={14} strokeWidth={2} aria-hidden="true" />
+            {showLocation ? 'Hide location' : 'Show on page'}
+          </button>
           {showLocation && <div className="suggestion-image-frame"><img src={suggestion.image} alt={`Masked page showing ${suggestion.location}`} /><span className="suggestion-image-marker" style={{ left: `${suggestion.bounds.x}%`, top: `${suggestion.bounds.y}%`, width: `${suggestion.bounds.width}%`, height: `${suggestion.bounds.height}%` }} /></div>}
         </div>
       )}
@@ -74,23 +88,24 @@ function SuggestionRow({ suggestion, index }: { suggestion: Suggestion; index: n
 
 // ─── Category detection helper ───────────────────────────────────────────────
 
-function categorizeSuggestion(text: string): { label: string; slug: string; icon: string } {
+function categorizeSuggestion(text: string): { label: string; slug: string; icon: IconSvgElement } {
   const t = text.toLowerCase();
   if (/aria|role|alt|label|contrast|keyboard|focus|screen.?reader|wcag|a11y/i.test(t))
-    return { label: 'Accessibility', slug: 'a11y', icon: '♿' };
+    return { label: 'Accessibility', slug: 'a11y', icon: UniversalAccessIcon };
   if (/lazy|load|lcp|cls|performance|cache|compress|webp|avif|preload|defer/i.test(t))
-    return { label: 'Performance', slug: 'perf', icon: '⚡' };
+    return { label: 'Performance', slug: 'perf', icon: FlashIcon };
   if (/semantic|heading|structure|h1|h2|html|landmark|section|nav/i.test(t))
-    return { label: 'Structure', slug: 'structure', icon: '🏗' };
+    return { label: 'Structure', slug: 'structure', icon: Structure01Icon };
   if (/color|spacing|font|typo|responsive|mobile|layout|padding|margin/i.test(t))
-    return { label: 'UX', slug: 'ux', icon: '✦' };
-  return { label: 'Code quality', slug: 'code', icon: '🔧' };
+    return { label: 'UX', slug: 'ux', icon: SparklesIcon };
+  return { label: 'Code quality', slug: 'code', icon: Wrench01Icon };
 }
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export function NoFindingState({ status, suggestions }: NoFindingStateProps) {
+export function NoFindingState({ status, reason, suggestions }: NoFindingStateProps) {
   const isNoFinding = status === 'no-finding';
+  const cleanReason = reason?.replace(/^(?:no-finding|inconclusive):\s*/i, '').trim();
 
   return (
     <div
@@ -100,35 +115,15 @@ export function NoFindingState({ status, suggestions }: NoFindingStateProps) {
     >
       {/* Animated shield icon */}
       <div className="no-finding-icon" aria-hidden="true">
-        <svg
+        <HugeiconsIcon
           className="shield-icon"
-          viewBox="0 0 48 48"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+          icon={isNoFinding ? ShieldCheckIcon : Shield01Icon}
+          size={64}
+          strokeWidth={1.75}
+          color="#14b8a6"
           role="img"
           aria-label={isNoFinding ? 'Shield checkmark — all clear' : 'Shield icon'}
-        >
-          <path
-            className="shield-path"
-            d="M24 4 L40 10 L40 22 C40 32 32 40 24 44 C16 40 8 32 8 22 L8 10 Z"
-            stroke="#14b8a6"
-            strokeWidth="2"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {isNoFinding && (
-            <path
-              className="check-path"
-              d="M16 24 L21 29 L32 18"
-              stroke="#14b8a6"
-              strokeWidth="2.5"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
-        </svg>
+        />
       </div>
 
       {/* Headline */}
@@ -138,12 +133,12 @@ export function NoFindingState({ status, suggestions }: NoFindingStateProps) {
         </h3>
         <p className="no-finding-sub muted">
           {isNoFinding
-            ? 'GhostQA completed the run without detecting any verified failures.'
-            : 'The run completed but could not confirm or deny a failure. Try again for a definitive result.'}
+            ? cleanReason || 'GhostQA completed the run without detecting any verified failures.'
+            : `${cleanReason ? `${cleanReason}. ` : ''}The run completed but could not confirm or deny a failure. Try again for a definitive result.`}
         </p>
       </div>
 
-      {isNoFinding && <div className="validation-success"><span aria-hidden="true">✓</span> Validation complete <small>No verified failure found</small></div>}
+      {isNoFinding && <div className="validation-success"><span aria-hidden="true"><HugeiconsIcon icon={Tick02Icon} size={18} strokeWidth={2.5} /></span> Validation complete <small>No verified failure found</small></div>}
 
       {/* Suggestions panel */}
       {suggestions.length > 0 && (

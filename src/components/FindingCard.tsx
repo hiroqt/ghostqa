@@ -1,6 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import ArrowRight01Icon from '@hugeicons/core-free-icons/ArrowRight01Icon';
+import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
+import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
+import Maximize01Icon from '@hugeicons/core-free-icons/Maximize01Icon';
+import Tick02Icon from '@hugeicons/core-free-icons/Tick02Icon';
 import type { RunReport } from '../lib/report';
 
 type Finding = NonNullable<RunReport['finding']>;
@@ -42,6 +48,7 @@ export function FindingCard({ finding, screenshot, highlight }: FindingCardProps
         <div className={`evidence-view ${expanded ? 'expanded' : ''}`}>
           <button type="button" className="copy-btn" onClick={() => setExpanded(!expanded)}
             aria-label={expanded ? 'Close enlarged evidence image' : 'Enlarge evidence image'}>
+            <HugeiconsIcon icon={expanded ? Cancel01Icon : Maximize01Icon} size={14} strokeWidth={2} aria-hidden="true" />
             {expanded ? 'Close image' : 'Enlarge image'}
           </button>
           <div className="evidence-frame">
@@ -69,7 +76,10 @@ export function FindingCard({ finding, screenshot, highlight }: FindingCardProps
       </ol>
 
       <details className="finding-details">
-        <summary>HTTP failures ({finding.httpFailures.length})</summary>
+        <summary>
+          <HugeiconsIcon className="details-chevron" icon={ArrowRight01Icon} size={14} strokeWidth={2} aria-hidden="true" />
+          HTTP failures ({finding.httpFailures.length})
+        </summary>
         {finding.httpFailures.length > 0 ? (
           <ul>
             {finding.httpFailures.map((item, index) => (
@@ -84,7 +94,10 @@ export function FindingCard({ finding, screenshot, highlight }: FindingCardProps
       </details>
 
       <details className="finding-details">
-        <summary>Console errors ({finding.consoleErrors.length})</summary>
+        <summary>
+          <HugeiconsIcon className="details-chevron" icon={ArrowRight01Icon} size={14} strokeWidth={2} aria-hidden="true" />
+          Console errors ({finding.consoleErrors.length})
+        </summary>
         {finding.consoleErrors.length > 0 ? (
           <ul>
             {finding.consoleErrors.map((error, index) => (
@@ -105,7 +118,8 @@ export function FindingCard({ finding, screenshot, highlight }: FindingCardProps
             onClick={handleCopy}
             aria-label={copied ? 'Copied to clipboard' : 'Copy Playwright test to clipboard'}
           >
-            {copied ? '✓ Copied!' : 'Copy'}
+            <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={14} strokeWidth={2} aria-hidden="true" />
+            {copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
         <pre className="code-block" role="region" aria-label="Playwright reproduction test code">

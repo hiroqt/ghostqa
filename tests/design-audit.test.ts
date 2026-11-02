@@ -140,4 +140,3 @@ test('agent guide leads with the design verdict and keeps guideline cues as supp
   expect(guide).toContain('**Supported by guidelines:** Repeated card grid');
   expect(guide).not.toContain("console.log('x')");
 });
-
