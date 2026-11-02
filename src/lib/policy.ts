@@ -62,7 +62,10 @@ export function assertAllowedUrl(
 function isPrivateHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
   // Strip brackets Playwright/URL keep around IPv6 literals.
-  const bare = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  const bracketless = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  // A single trailing dot is the fully-qualified form of the same host
+  // (`localhost.` resolves to loopback), so normalize it away before matching.
+  const bare = bracketless.endsWith('.') ? bracketless.slice(0, -1) : bracketless;
 
   if (bare === 'localhost' || bare.endsWith('.localhost')) return true;
 
@@ -82,8 +85,19 @@ function isPrivateHost(hostname: string): boolean {
   // IPv6 literals.
   if (bare === '::1' || bare === '::') return true; // loopback / unspecified
   if (bare.startsWith('::ffff:')) {
-    // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) — re-check the embedded IPv4.
-    return isPrivateHost(bare.slice('::ffff:'.length));
+    // IPv4-mapped IPv6. The dotted form (::ffff:127.0.0.1) survives only if the
+    // caller passed it directly; WHATWG URL normalizes it to the hex-compressed
+    // form (::ffff:7f00:1). Handle both by reconstructing the embedded IPv4 and
+    // re-checking it against the IPv4 ranges above.
+    const mapped = bare.slice('::ffff:'.length);
+    const hex = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(mapped);
+    if (hex) {
+      const high = parseInt(hex[1], 16);
+      const low = parseInt(hex[2], 16);
+      const dotted = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+      return isPrivateHost(dotted);
+    }
+    return isPrivateHost(mapped);
   }
   const firstHextet = bare.includes(':') ? bare.split(':')[0] : '';
   if (firstHextet) {

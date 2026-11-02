@@ -103,6 +103,20 @@ describe('GQ-001 URL policy', () => {
     expect(() => assertLiveUrl(url)).toThrowError(expect.objectContaining({ code: 'PRIVATE_HOST_DENIED' }));
   });
 
+  it.each([
+    // Trailing-dot (fully-qualified) loopback forms resolve to loopback.
+    'http://localhost./',
+    'http://localhost.:8080/admin',
+    'https://app.localhost./',
+    // IPv4-mapped IPv6 literals whose embedded IPv4 is private/loopback/metadata.
+    'http://[::ffff:127.0.0.1]/',
+    'http://[::ffff:169.254.169.254]/latest/meta-data',
+    'http://[::ffff:10.0.0.1]/',
+    'http://[::ffff:192.168.1.1]/',
+  ])('rejects normalized private-host bypass %s in live mode', (url) => {
+    expect(() => assertLiveUrl(url)).toThrowError(expect.objectContaining({ code: 'PRIVATE_HOST_DENIED' }));
+  });
+
   it('accepts a public target adjacent to a private range in live mode', () => {
     // Guard against over-broad substring matching: 172.15.x and 172.32.x are public.
     expect(assertLiveUrl('http://172.15.0.1/').origin).toBe('http://172.15.0.1');

@@ -33,6 +33,9 @@ Invariants / security:
   - private IPv4 `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
   - link-local IPv4 `169.254.0.0/16` (includes cloud metadata `169.254.169.254`)
   - IPv6 unique-local `fc00::/7` (fc00..fdff) and IPv6 link-local `fe80::/10`
+- SSRF literal-form normalization (live mode only). The WHATWG `URL` parser normalizes several encodings of the same host; the rejection must hold after normalization, not only for the dotted-quad/plain spelling. In particular:
+  - A single trailing dot on a hostname (the fully-qualified form, e.g. `localhost.`, `app.localhost.`) resolves to the same host and MUST be rejected. Strip one trailing dot before matching `localhost`/`.localhost` and before the IPv4 regex.
+  - IPv4-mapped IPv6 literals are normalized to the hex-compressed form (e.g. `http://[::ffff:127.0.0.1]/` -> `[::ffff:7f00:1]`, `::ffff:169.254.169.254` -> `::ffff:a9fe:a9fe`). The embedded IPv4 MUST be reconstructed from the trailing hextets and re-checked against the IPv4 private ranges so loopback, the `169.254.169.254` cloud-metadata endpoint, and the private ranges are rejected.
 - Compare parsed origins, never host substrings or suffixes. Reject invalid allowlist entries instead of silently ignoring them.
 - A permitted initial URL does not authorize a later URL; the caller must validate each navigation and redirect.
 
@@ -46,6 +49,8 @@ Acceptance criteria (Given/When/Then):
 - Given a nonlocal or malformed allowlist entry and live mode off, when checked, then reject the configuration.
 - Given live mode on and a submitted public HTTP(S) URL with no `ALLOWED_ORIGINS` configured, when checked with `assertLiveUrl`, then return the normalized URL and its origin as the single-origin allowlist.
 - Given live mode on and a submitted URL targeting a private/internal/loopback host (localhost, 127.x, 0.0.0.0, 10.x, 172.16-31.x, 192.168.x, 169.254.x, ::1, fc00::/fe80::), when checked with `assertLiveUrl`, then reject it with `PRIVATE_HOST_DENIED`.
+- Given live mode on and a submitted URL using a trailing-dot host (`http://localhost./`, `http://app.localhost./`), when checked with `assertLiveUrl`, then reject it with `PRIVATE_HOST_DENIED`.
+- Given live mode on and a submitted URL using an IPv4-mapped IPv6 literal whose embedded IPv4 is private/loopback (`http://[::ffff:127.0.0.1]/`, `http://[::ffff:169.254.169.254]/`, `http://[::ffff:10.0.0.1]/`), when checked with `assertLiveUrl`, then reject it with `PRIVATE_HOST_DENIED`.
 - Given live mode on and a `file:`/`data:`/`javascript:`/non-http(s)/credentialed URL, when checked with `assertLiveUrl`, then reject it.
 - Given live mode off, when checked, then `ALLOWED_ORIGINS` (loopback default) is required and used; loopback is NOT rejected.
 - Given a redirect or action navigation URL, when checked with the same function, then enforce the same restrictions.
