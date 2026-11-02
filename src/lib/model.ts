@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import OpenAI from 'openai';
-import { decisionSchema, type Decision, type DecisionContext } from './contracts';
+import { decisionSchema, type Decision, type DecisionContext, type Suggestion } from './contracts';
 
 export function parseDecision(raw: unknown): Decision {
   if (typeof raw === 'string') {
@@ -12,7 +12,7 @@ export function parseDecision(raw: unknown): Decision {
 
 export interface ReasoningAdapter {
   decide(context: DecisionContext): Promise<Decision>;
-  suggestImprovements(dom: string, screenshotPath: string): Promise<string[]>;
+  suggestImprovements(dom: string, screenshotPath: string): Promise<Suggestion[]>;
 }
 
 export class MockAdapter implements ReasoningAdapter {
@@ -25,11 +25,29 @@ export class MockAdapter implements ReasoningAdapter {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async suggestImprovements(_dom: string, _screenshotPath: string): Promise<string[]> {
+  async suggestImprovements(_dom: string, _screenshotPath: string): Promise<Suggestion[]> {
     return [
-      'Add ARIA landmark roles to major sections for better screen reader navigation',
-      'Ensure all images have descriptive alt attributes',
-      'Consider lazy-loading below-the-fold images to improve initial page load performance',
+      {
+        text: 'Add ARIA landmark roles to major sections for better screen reader navigation',
+        reason: 'Landmarks help screen reader users move between major page regions.',
+        selector: 'header, main, footer',
+        location: '<header> / <main>',
+        codeSnippet: '<header role="banner">\n  <nav role="navigation" aria-label="Primary">\n    ...\n  </nav>\n</header>',
+      },
+      {
+        text: 'Ensure all images have descriptive alt attributes',
+        reason: 'Alternative text conveys the image meaning when it cannot be seen.',
+        selector: 'img:not([alt]), img[alt=""]',
+        location: '<img>',
+        codeSnippet: '<!-- before -->\n<img src="hero.png">\n\n<!-- after -->\n<img src="hero.png" alt="Homepage hero illustration showing dashboard">',
+      },
+      {
+        text: 'Consider lazy-loading below-the-fold images to improve initial page load performance',
+        reason: 'Deferring offscreen images can reduce initial network work.',
+        selector: 'img',
+        location: '<img> (below fold)',
+        codeSnippet: '<img src="photo.jpg" alt="..." loading="lazy" width="800" height="600">',
+      },
     ];
   }
 }
@@ -80,16 +98,22 @@ export class MetaAdapter implements ReasoningAdapter {
     }
   }
 
-  async suggestImprovements(dom: string, screenshotPath: string): Promise<string[]> {
+  async suggestImprovements(dom: string, screenshotPath: string): Promise<Suggestion[]> {
     try {
       const parts: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
         {
           type: 'text',
           text: [
             'You are a web quality advisor. Analyze the following sanitized DOM and screenshot.',
-            'Return a JSON array of 3 to 5 concise improvement suggestions covering UX, accessibility, performance patterns, and code structure.',
-            'Reply with ONLY a minified JSON array of strings, no prose, no markdown fences.',
-            'Example: ["Add aria-label to nav links","Ensure sufficient color contrast"]',
+            'Return a JSON array of 3 to 5 improvement objects, each with these exact keys:',
+            '  text       — concise description of the improvement (string)',
+            '  reason     — why this matters based on visible evidence (string)',
+            '  selector   — CSS selector or element path pointing to the affected element (string)',
+            '  location   — short label for the UI chip, e.g. "nav > a" or "<img>" (string)',
+            '  codeSnippet — a short before/after HTML or CSS snippet illustrating the fix (string, may be empty)',
+            'Cover UX, accessibility, performance patterns, and code structure.',
+            'Reply with ONLY a minified JSON array, no prose, no markdown fences.',
+            'Example: [{"text":"Add alt text","selector":"img","location":"<img>","codeSnippet":"<img src=\\"x\\" alt=\\"desc\\">"}]',
             '',
             `Sanitized DOM: ${dom.slice(0, 4000)}`,
           ].join('\n'),
@@ -108,7 +132,16 @@ export class MetaAdapter implements ReasoningAdapter {
       if (typeof content !== 'string') return [];
       const parsed: unknown = JSON.parse(content.trim());
       if (!Array.isArray(parsed)) return [];
-      return parsed.filter((s): s is string => typeof s === 'string').slice(0, 5);
+      return (parsed as unknown[])
+        .filter((s): s is Suggestion =>
+          typeof s === 'object' && s !== null &&
+          'text' in s && typeof (s as { text: unknown }).text === 'string' &&
+          'selector' in s && typeof (s as { selector: unknown }).selector === 'string' &&
+          'location' in s && typeof (s as { location: unknown }).location === 'string' &&
+          'codeSnippet' in s && typeof (s as { codeSnippet: unknown }).codeSnippet === 'string' &&
+          (!('reason' in s) || typeof (s as { reason: unknown }).reason === 'string'),
+        )
+        .slice(0, 5);
     } catch {
       return [];
     }

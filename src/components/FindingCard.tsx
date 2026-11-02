@@ -8,10 +8,12 @@ type Finding = NonNullable<RunReport['finding']>;
 interface FindingCardProps {
   finding: Finding;
   screenshot?: string;
+  highlight?: { x: number; y: number; width: number; height: number };
 }
 
-export function FindingCard({ finding, screenshot }: FindingCardProps) {
+export function FindingCard({ finding, screenshot, highlight }: FindingCardProps) {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   async function handleCopy() {
     try {
@@ -37,11 +39,19 @@ export function FindingCard({ finding, screenshot }: FindingCardProps) {
       </dl>
 
       {screenshot && (
-        <img
-          className="finding-screenshot"
-          src={screenshot}
-          alt="Masked browser screenshot of the verified failure"
-        />
+        <div className={`evidence-view ${expanded ? 'expanded' : ''}`}>
+          <button type="button" className="copy-btn" onClick={() => setExpanded(!expanded)}
+            aria-label={expanded ? 'Close enlarged evidence image' : 'Enlarge evidence image'}>
+            {expanded ? 'Close image' : 'Enlarge image'}
+          </button>
+          <div className="evidence-frame">
+            <img className={`finding-screenshot ${expanded ? 'expanded' : ''}`} src={screenshot}
+              alt="Masked browser screenshot of the verified failure" />
+            {highlight && <span className="evidence-highlight" style={{ left: `${highlight.x}%`, top: `${highlight.y}%`, width: `${highlight.width}%`, height: `${highlight.height}%` }}>
+              <span>Observed outcome</span>
+            </span>}
+          </div>
+        </div>
       )}
 
       <h3 className="finding-section-title">Replay steps</h3>

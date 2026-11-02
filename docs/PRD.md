@@ -23,6 +23,7 @@ As a developer, I enter my local demo URL and a goal (e.g. "try registering"), s
 | GQ-008 | P0 | Live UI | URL input, goal input, start button, status, action log, report/no-finding state. |
 | GQ-009 | P0 | Demo fixture | Newly created local site with one intentionally broken registration workflow and synthetic inputs. |
 | GQ-010 | P0 | Submission transparency | Public-repo-ready README, setup, new-work statement, safety limitations, and 3-minute demo outline. |
+| GQ-011 | P1 | AI slop pattern review | On a separately selected review run, inspect only same-origin HTML/CSS/JS delivered to Chromium. In explicit live mode, accept one user-submitted public HTTP(S) URL under the existing live URL policy; block non-read requests. Show an animated `AI SLOP` stamp on the masked preview and a story with more than five distinct, evidence-backed observations spanning at least three design/code areas, why each matters, what to avoid, a relevant GitHub skill, and what to change. With fewer than six supported observations or fewer than three areas, show `insufficient evidence` and no stamp. State that patterns do not establish AI authorship. Preserve the one-site, 10-action, 60-second limits and the functional bug report semantics. |
 
 ## Non-goals
 General-purpose pentesting, vulnerability scanning, third-party website crawling, automatic bug fixes, full accessibility audit, user authentication, cloud deployment, multi-run analytics, multi-agent systems, remote browser farms, broad model benchmarking.
@@ -36,6 +37,8 @@ General-purpose pentesting, vulnerability scanning, third-party website crawling
 
 ## Time budget
 Day 1: scaffold, safety policy, observer, adapter, action loop, fixture. Day 2: verification, report, UI, test stabilization, README, video. Cut polish before cutting safety or evidence.
+
+GQ-011 is a user-approved P1 scope addition on 2026-11-02. It adds a separate source-pattern review and one fixture route. The user later extended it to one public live URL when live mode is enabled. It does not replace any P0 verification gate. Its implementation and review consume the remaining polish budget before submission work.
 
 ## Scope change protocol
 Any new feature requires user approval, PRD update, acceptance criteria, tests, and time-budget impact. No agent may silently expand scope.

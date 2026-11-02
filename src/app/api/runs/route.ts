@@ -10,6 +10,7 @@ let running = false;
 const runRequest = z.strictObject({
   url: z.string().max(2048),
   goal: z.string().max(200).optional(),
+  mode: z.enum(['test', 'slop']).optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -46,8 +47,8 @@ export async function POST(request: Request): Promise<Response> {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const emit = (event: Record<string, unknown>) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
-      void runDemo(url, input.goal ?? '', emit)
-        .then(({ report, screenshot }) => emit({ type: 'done', report, screenshot }))
+      void runDemo(url, input.goal ?? '', emit, input.mode ?? 'test')
+        .then(({ report, screenshot, highlight }) => emit({ type: 'done', report, screenshot, highlight }))
         .catch((error: unknown) => {
           const message = error instanceof Error && /^(Action limit reached|Run timed out|Replay exceeds action limit)$/.test(error.message)
             ? error.message : 'Run stopped safely; check the local fixture and Chromium';

@@ -16,7 +16,7 @@ export function authorizeAction(raw: unknown, gate: RunGate): ProposedAction {
       // In the loopback default the fixture exposes only these paths; live mode
       // permits any path on an already-allowlisted origin. The origin gate above
       // still rejects cross-origin navigation in both modes.
-      if (!gate.liveMode && (!['/', '/register', '/health'].includes(new URL(action.value).pathname) || new URL(action.value).search)) {
+      if (!gate.liveMode && (!['/', '/register', '/health', '/slop'].includes(new URL(action.value).pathname) || new URL(action.value).search)) {
         throw new Error('Navigation path denied');
       }
       return action;
@@ -55,6 +55,7 @@ export async function installNetworkGuard(
   context: BrowserContext,
   allowedOrigins: readonly string[],
   liveMode = false,
+  readOnly = false,
 ): Promise<void> {
   await context.route('**/*', async (route) => {
     try {
@@ -63,10 +64,11 @@ export async function installNetworkGuard(
       // its single POST are allowed; live mode permits normal navigation and
       // sub-resource requests within the already-allowlisted origin.
       const url = assertAllowedUrl(route.request().url(), allowedOrigins, { liveMode });
+      if (readOnly && !['GET', 'HEAD'].includes(route.request().method())) throw new Error('Review request method denied');
       if (!liveMode) {
         const method = route.request().method();
         const parsed = new URL(url);
-        if (!['/', '/register', '/health'].includes(parsed.pathname) || parsed.search ||
+        if (!['/', '/register', '/health', '/slop', '/slop.css', '/slop.js'].includes(parsed.pathname) || parsed.search ||
             (!['GET', 'HEAD'].includes(method) && !(method === 'POST' && parsed.pathname === '/register'))) {
           throw new Error('Request method denied');
         }
