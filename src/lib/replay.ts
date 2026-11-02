@@ -40,8 +40,8 @@ export async function replayOnce(
     page.on('download', (download) => { void download.cancel(); });
     page.on('dialog', (dialog) => { void dialog.dismiss(); });
     const origin = new URL(url).origin;
-    const beforeObserver = createObserver(page, origin, join(evidenceDir, 'replay-before.png'));
-    const afterObserver = createObserver(page, origin, join(evidenceDir, 'replay-after.png'));
+    const beforeObserver = createObserver(page, origin, join(evidenceDir, 'replay-before.png'), gate.liveMode);
+    const afterObserver = createObserver(page, origin, join(evidenceDir, 'replay-after.png'), gate.liveMode);
     authorizeAction(navigation, gate);
     await perform(navigation);
 
