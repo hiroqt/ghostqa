@@ -16,7 +16,7 @@ async function attribute(locator: Locator, name: string): Promise<string | undef
   return value ? clean(value) : undefined;
 }
 
-export function createObserver(page: Page, allowedOrigin: string, screenshotPath: string) {
+export function createObserver(page: Page, allowedOrigin: string, screenshotPath: string, liveMode = false) {
   const consoleErrors: string[] = [];
   const httpFailures: Observation['httpFailures'] = [];
 
@@ -36,7 +36,7 @@ export function createObserver(page: Page, allowedOrigin: string, screenshotPath
 
   return {
     async observe(): Promise<Observation> {
-      assertAllowedUrl(page.url(), [allowedOrigin]);
+      assertAllowedUrl(page.url(), [allowedOrigin], { liveMode });
       const headings = await page.locator('h1,h2,h3').all();
       const textControls = await page.locator('a,button,label').all();
       const fields = await page.locator('input,select,textarea').all();

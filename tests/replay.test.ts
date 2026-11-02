@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import type { Browser, Page } from 'playwright';
 import { replayOnce } from '../src/lib/replay';
 
-function fakeBrowser(failClick = false) {
+function fakeBrowser(failClick = false, origin = 'http://127.0.0.1:3001') {
   let currentUrl = 'about:blank';
   let heading = 'Register';
   let closed = false;
@@ -27,7 +27,7 @@ function fakeBrowser(failClick = false) {
           heading = 'Registration failed';
           responseListeners.forEach((listener) => listener({
             status: () => 500,
-            url: () => 'http://127.0.0.1:3001/register',
+            url: () => `${origin}/register`,
           }));
         },
       }),
@@ -59,6 +59,24 @@ test('replays exact steps in a fresh context and captures the repeated failure',
   expect(fake.inputs).toEqual(['Email:demo@example.test', 'Password:synthetic-password']);
   expect(JSON.parse(replay.before.dom).headings).toEqual(['Register']);
   expect(replay.after.httpFailures).toEqual([{ url: 'http://127.0.0.1:3001/register', status: 500 }]);
+  expect(replay.replaySteps.map((action) => action.type)).toEqual(['navigate', 'fill', 'fill', 'click']);
+  expect(gate.actionCount).toBe(8);
+  expect(fake.isClosed()).toBe(true);
+});
+
+test('replays against an authorized public origin when live mode is enabled', async () => {
+  const origin = 'https://demo.example.com';
+  const fake = fakeBrowser(false, origin);
+  const gate = { allowedOrigins: [origin], actionCount: 4, startedAt: Date.now(), liveMode: true };
+  const actions = [
+    { type: 'fill', target: 'Email', value: 'demo@example.test' },
+    { type: 'fill', target: 'Password', value: 'synthetic-password' },
+    { type: 'click', target: 'Create account' },
+  ] as const;
+  const replay = await replayOnce(fake.browser, `${origin}/register`, actions, gate, '/tmp/ghostqa-replay-live');
+
+  expect(JSON.parse(replay.before.dom).headings).toEqual(['Register']);
+  expect(replay.after.httpFailures).toEqual([{ url: `${origin}/register`, status: 500 }]);
   expect(replay.replaySteps.map((action) => action.type)).toEqual(['navigate', 'fill', 'fill', 'click']);
   expect(gate.actionCount).toBe(8);
   expect(fake.isClosed()).toBe(true);

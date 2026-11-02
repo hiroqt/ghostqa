@@ -7,7 +7,7 @@ import { createObserver } from './browser';
 import type { ActionTrace, Decision, ProposedAction } from './contracts';
 import { evaluateOutcome } from './evaluator';
 import { authorizeAction, executeAction, installNetworkGuard } from './executor';
-import { MockAdapter, type ReasoningAdapter } from './model';
+import { MetaAdapter, MockAdapter, type ReasoningAdapter } from './model';
 import { replayOnce } from './replay';
 import { buildReport, type RunReport } from './report';
 
@@ -29,9 +29,18 @@ function demoDecisions(url: string, goal: string): Decision[] {
   return actions.map(({ action, expected }) => ({ kind: 'action', action, expected, rationale: 'Exercise the seeded registration flow' }));
 }
 
+// The mock drives the seeded fixture flow; the Meta adapter drives any
+// authorized page. Live mode only matters for which origins the policy gate
+// accepts (handled by the route); the loop invariants are identical.
+function selectAdapter(url: string, goal: string): ReasoningAdapter {
+  if (process.env.MODEL_MODE === 'meta') return new MetaAdapter();
+  return new MockAdapter(demoDecisions(url, goal));
+}
+
 export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ report: RunReport; screenshot?: string }> {
+  const liveMode = process.env.ALLOW_LIVE_SITES === 'true';
   const origin = new URL(url).origin;
-  const gate = { allowedOrigins: [origin], actionCount: 0, startedAt: Date.now() };
+  const gate = { allowedOrigins: [origin], actionCount: 0, startedAt: Date.now(), liveMode };
   const evidenceDir = join(tmpdir(), 'ghostqa', randomUUID());
   let browser: Browser | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -42,7 +51,7 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
     const activeBrowser = browser;
     timer = setTimeout(() => { void activeBrowser.close().catch(() => {}); }, Math.max(1, 60_000 - (Date.now() - gate.startedAt)));
     const context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
-    await installNetworkGuard(context, gate.allowedOrigins);
+    await installNetworkGuard(context, gate.allowedOrigins, liveMode);
     const page = await context.newPage();
     page.setDefaultTimeout(10_000);
     page.on('download', (download) => { void download.cancel(); });
@@ -64,31 +73,36 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
 
     const initial = authorizeAction({ type: 'navigate', value: url }, gate);
     await perform(initial);
-    const observer = createObserver(page, origin, join(evidenceDir, 'latest.png'));
+    const observer = createObserver(page, origin, join(evidenceDir, 'latest.png'), liveMode);
     let observation = await observer.observe();
-    emit({ type: 'status', message: 'Observing local page' });
+    emit({ type: 'status', message: 'Observing page' });
 
-    const adapter: ReasoningAdapter = new MockAdapter(demoDecisions(url, goal));
+    const adapter: ReasoningAdapter = selectAdapter(url, goal);
     const steps: ProposedAction[] = [];
+    // General observe -> decide -> execute -> evaluate loop. The action and time
+    // budgets live in the gate (authorizeAction throws once either is spent), so
+    // the loop simply runs until the model stops or a budget error is thrown.
     for (;;) {
       const decision = await adapter.decide({ observation, goal, priorTrace: trace });
       if (decision.kind === 'stop') {
-        const expected = new URL(url).pathname === '/health' ? 'Demo is ready' : '';
-        const status = expected && evaluateOutcome({ expectedText: expected, before: observation, after: observation }).status === 'no-finding'
-          ? 'no-finding' : 'inconclusive';
-        return { report: buildReport({ status, reason: decision.reason, trace }) };
+        // A stop means the agent completed without reproducing a verified bug.
+        // That is a no-finding by definition; a verified finding returns earlier.
+        return { report: buildReport({ status: 'no-finding', reason: decision.reason, trace }) };
       }
       const before = observation;
       const action = authorizeAction(decision.action, gate);
       await perform(action);
       steps.push(action);
       observation = await observer.observe();
-      if (decision.expected !== 'Registration complete') continue;
 
-      const suspected = evaluateOutcome({ expectedText: decision.expected, before, after: observation });
-      if (suspected.status !== 'suspected') {
-        return { report: buildReport({ status: suspected.status === 'no-finding' ? 'no-finding' : 'inconclusive', reason: suspected.actual, trace }) };
-      }
+      const evaluation = evaluateOutcome({ expectedText: decision.expected, before, after: observation });
+      // no-finding: the expectation held, keep driving toward the goal.
+      if (evaluation.status === 'no-finding') continue;
+      // inconclusive: no new HTTP failure to support a finding; keep going so the
+      // model can try another step within budget rather than reporting a guess.
+      if (evaluation.status === 'inconclusive') continue;
+
+      // suspected: replay once from a fresh context before claiming anything.
       emit({ type: 'status', message: 'Replaying suspected failure once' });
       let replayEntry: ActionTrace | undefined;
       const replay = await replayOnce(browser, url, steps, gate, evidenceDir, (action, outcome) => {

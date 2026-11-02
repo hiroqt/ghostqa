@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { assertAllowedUrl } from '../../../lib/policy';
+import { assertAllowedUrl, assertLiveUrl } from '../../../lib/policy';
 import { runDemo } from '../../../lib/run';
 
 export const runtime = 'nodejs';
@@ -13,16 +13,29 @@ const runRequest = z.strictObject({
 });
 
 export async function POST(request: Request): Promise<Response> {
+  const modelMode = process.env.MODEL_MODE ?? 'mock';
+  if (modelMode !== 'mock' && modelMode !== 'meta') {
+    return Response.json({ error: 'Unknown MODEL_MODE' }, { status: 503 });
+  }
+  const liveMode = process.env.ALLOW_LIVE_SITES === 'true';
   let input: z.infer<typeof runRequest>;
   let url: string;
   try {
     input = runRequest.parse(await request.json());
-    url = assertAllowedUrl(input.url, (process.env.ALLOWED_ORIGINS ?? 'http://127.0.0.1:3001').split(',').map((origin) => origin.trim()));
+    if (liveMode) {
+      // Live mode: the per-run allowlist is derived from the submitted URL's
+      // origin. ALLOWED_ORIGINS is not required; private/internal hosts are
+      // rejected (SSRF). The run stays locked to this single origin.
+      url = assertLiveUrl(input.url).url;
+    } else {
+      // Safe default: loopback-only, allowlist from ALLOWED_ORIGINS.
+      const origins = (process.env.ALLOWED_ORIGINS ?? 'http://127.0.0.1:3001')
+        .split(',').map((origin) => origin.trim()).filter(Boolean);
+      url = assertAllowedUrl(input.url, origins);
+    }
   } catch {
-    return Response.json({ error: 'Only the configured local demo URL is allowed' }, { status: 400 });
-  }
-  if (process.env.MODEL_MODE && process.env.MODEL_MODE !== 'mock') {
-    return Response.json({ error: 'Live Meta integration is not verified' }, { status: 503 });
+    const message = liveMode ? 'Only an allowlisted origin is allowed' : 'Only the configured local demo URL is allowed';
+    return Response.json({ error: message }, { status: 400 });
   }
   if (running) return Response.json({ error: 'A run is already active' }, { status: 409 });
   running = true;

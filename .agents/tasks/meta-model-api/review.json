@@ -1,0 +1,17 @@
+{
+  "verdict": "APPROVED",
+  "findings": [],
+  "reviewDoc": "/Users/arnel/Projects/ghostqa/.agents/tasks/meta-model-api/review.md",
+  "resolution": {
+    "previousVerdict": "CHANGES_REQUESTED",
+    "fixed": [
+      {
+        "title": "Replay observers ignore live mode, making verified findings unreachable on live sites",
+        "location": "src/lib/replay.ts:43-44",
+        "fix": "Threaded gate.liveMode into both createObserver calls (replay-before and replay-after). observe() now runs assertAllowedUrl with the run's live-mode flag, so an authorized public origin passes the GQ-001 allowlist check during replay observation; loopback-only remains the default when live mode is off.",
+        "test": "tests/replay.test.ts 'replays against an authorized public origin when live mode is enabled' — RED confirmed by reverting the fix (threw UrlPolicyError INVALID_ALLOWLIST from observe()), GREEN after the fix.",
+        "verification": "npm run check PASS; npm run test PASS 51/51; npm run test:e2e PASS 3/3; node scripts/meta-smoke.mjs NOT RUN (no MODEL_API_KEY / no verified network in sandbox)."
+      }
+    ]
+  }
+}
