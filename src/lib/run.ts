@@ -45,6 +45,8 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
   let browser: Browser | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const trace: ActionTrace[] = [];
+  let adapter: ReasoningAdapter | undefined;
+  let lastObservation: { dom: string; screenshotPath: string } | undefined;
   try {
     emit({ type: 'status', message: 'Launching local Chromium' });
     browser = await chromium.launch({ headless: true, timeout: 15_000 });
@@ -75,9 +77,10 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
     await perform(initial);
     const observer = createObserver(page, origin, join(evidenceDir, 'latest.png'), liveMode);
     let observation = await observer.observe();
+    lastObservation = { dom: observation.dom, screenshotPath: observation.screenshotPath };
     emit({ type: 'status', message: 'Observing page' });
 
-    const adapter: ReasoningAdapter = selectAdapter(url, goal);
+    adapter = selectAdapter(url, goal);
     const steps: ProposedAction[] = [];
     // General observe -> decide -> execute -> evaluate loop. The action and time
     // budgets live in the gate (authorizeAction throws once either is spent), so
@@ -87,13 +90,16 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
       if (decision.kind === 'stop') {
         // A stop means the agent completed without reproducing a verified bug.
         // That is a no-finding by definition; a verified finding returns earlier.
-        return { report: buildReport({ status: 'no-finding', reason: decision.reason, trace }) };
+        const suggestions = await adapter.suggestImprovements(observation.dom, observation.screenshotPath).catch(() => [] as string[]);
+        const report = buildReport({ status: 'no-finding', reason: decision.reason, trace });
+        return { report: { ...report, suggestions } };
       }
       const before = observation;
       const action = authorizeAction(decision.action, gate);
       await perform(action);
       steps.push(action);
       observation = await observer.observe();
+      lastObservation = { dom: observation.dom, screenshotPath: observation.screenshotPath };
 
       const evaluation = evaluateOutcome({ expectedText: decision.expected, before, after: observation });
       // no-finding: the expectation held, keep driving toward the goal.
@@ -114,7 +120,9 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
       });
       const final = evaluateOutcome({ expectedText: decision.expected, before, after: observation, replay });
       if (final.status !== 'verified') {
-        return { report: buildReport({ status: 'inconclusive', reason: 'Failure did not reproduce consistently', trace }) };
+        const suggestions = await adapter.suggestImprovements(observation.dom, observation.screenshotPath).catch(() => [] as string[]);
+        const report = buildReport({ status: 'inconclusive', reason: 'Failure did not reproduce consistently', trace });
+        return { report: { ...report, suggestions } };
       }
       const screenshot = `data:image/png;base64,${(await readFile(observation.screenshotPath)).toString('base64')}`;
       const report = buildReport({
@@ -127,7 +135,11 @@ export async function runDemo(url: string, goal: string, emit: Emit): Promise<{ 
     const reason = Date.now() - gate.startedAt >= 60_000 ? 'Run timed out'
       : error instanceof Error && /^(Action limit reached|Replay exceeds action limit)$/.test(error.message) ? error.message
         : 'Run stopped safely; check the local fixture and Chromium';
-    return { report: buildReport({ status: 'inconclusive', reason, trace }) };
+    const suggestions = adapter
+      ? await adapter.suggestImprovements(lastObservation?.dom ?? '', lastObservation?.screenshotPath ?? '').catch(() => [] as string[])
+      : [];
+    const report = buildReport({ status: 'inconclusive', reason, trace });
+    return { report: { ...report, suggestions } };
   } finally {
     if (timer) clearTimeout(timer);
     await browser?.close().catch(() => {});
