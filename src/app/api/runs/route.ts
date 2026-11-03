@@ -44,9 +44,12 @@ export async function POST(request: Request): Promise<Response> {
   if (running) return Response.json({ error: 'A run is already active' }, { status: 409 });
   running = true;
   const encoder = new TextEncoder();
+  let cancelled = false;
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      const emit = (event: Record<string, unknown>) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      const emit = (event: Record<string, unknown>) => {
+        if (!cancelled) controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      };
       void runDemo(url, input.goal ?? '', emit, input.mode ?? 'test')
         .then(({ report, screenshot, highlight }) => emit({ type: 'done', report, screenshot, highlight }))
         .catch((error: unknown) => {
@@ -54,8 +57,9 @@ export async function POST(request: Request): Promise<Response> {
             ? error.message : 'Run stopped safely; check the local fixture and Chromium';
           emit({ type: 'error', message });
         })
-        .finally(() => { running = false; controller.close(); });
+        .finally(() => { running = false; if (!cancelled) controller.close(); });
     },
+    cancel() { cancelled = true; },
   });
   return new Response(stream, {
     headers: {

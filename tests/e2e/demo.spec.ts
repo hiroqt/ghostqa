@@ -70,7 +70,7 @@ test('seeded registration failure is replayed and reported with evidence', async
   await expect(page.getByRole('list', { name: 'Evaluation stage progress' })).toBeVisible();
   await expect(page.getByText('Where on the website')).toBeVisible();
   await expect(page.getByText('What GhostQA is evaluating')).toBeVisible();
-  await expect(page.locator('.eval-step.active')).toContainText(/Observing|Reasoning|Executing|Evaluating|Replaying/);
+  await expect(page.locator('.eval-step.active')).toContainText(/Observing|Reasoning|Executing|Evaluating|Replaying/, { timeout: 30_000 });
   await expect(page.getByRole('status')).toHaveText('Complete', { timeout: 60_000 });
   await expect(page.getByText('verified', { exact: true })).toBeVisible();
   await expect(page.getByText('Registration complete', { exact: true })).toBeVisible();

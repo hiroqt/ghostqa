@@ -125,3 +125,20 @@ test('technical review admits one public origin only in explicit live mode', asy
   expect(privateResponse.status).toBe(400);
   expect(runDemo).not.toHaveBeenCalled();
 });
+
+test('client cancellation does not leave the run locked or close the stream twice', async () => {
+  let finish: (() => void) | undefined;
+  runDemo.mockImplementationOnce(async (_url, _goal, emit) => {
+    await new Promise<void>((resolve) => { finish = resolve; });
+    emit({ type: 'status', message: 'Late result' });
+    return { report: { status: 'no-finding' } } as never;
+  });
+  const response = await POST(makeRequest({ url: 'http://127.0.0.1:3001/health' }));
+  await response.body?.cancel();
+  finish?.();
+  await vi.waitFor(async () => {
+    const next = await POST(makeRequest({ url: 'http://127.0.0.1:3001/health' }));
+    expect(next.status).toBe(200);
+    await drain(next);
+  });
+});
