@@ -13,9 +13,9 @@ cp .env.example .env
 node fixtures/demo/start.mjs
 ```
 
-In another terminal, run `npm run dev`. Open `http://127.0.0.1:3000` and use `http://127.0.0.1:3001/register` for the seeded failure or `http://127.0.0.1:3001/health` for a healthy flow. The fixture uses synthetic data only. `ALLOWED_ORIGINS` in `.env` must list the exact local demo origin; the default is `http://127.0.0.1:3001`.
+In another terminal, run `npm run dev`. Open `http://127.0.0.1:3000`, then choose **Open dashboard** or **Try GhostQA** to reach `/dashboard`. Use `http://127.0.0.1:3001/register` for the seeded failure or `http://127.0.0.1:3001/health` for a healthy flow. The fixture uses synthetic data only. `ALLOWED_ORIGINS` in `.env` must list the exact local demo origin; the default is `http://127.0.0.1:3001`.
 
-Select **AI slop design and code review** and use `http://127.0.0.1:3001/slop` for the synthetic pattern fixture. This separate mode reviews bounded same-origin HTML/CSS/JS delivered to Chromium and stamps the masked preview only when six distinct source-backed observations span three design or code areas. `/health` demonstrates the insufficient-evidence state. The label is a design critique, not an AI-authorship determination or a replay-verified bug. See [pattern research](docs/research/ai-generated-patterns.md).
+Select **AI slop design and code review** and use `http://127.0.0.1:3001/slop` for the synthetic pattern fixture. This separate mode measures the rendered page and reviews bounded same-origin HTML/CSS/JS delivered to Chromium. The stamp requires a design score of at least 50 across two design aspects, including one strong signal; source patterns only support the design observations. `/health` demonstrates the insufficient-evidence state. The label is a design critique, not an AI-authorship determination or a replay-verified bug. See [pattern research](docs/research/ai-generated-patterns.md).
 
 The review recognizes 35 bounded source cues across components, cards, copy, typography, backgrounds, color, motion, imagery, and delivered code, drawing from the [Impeccable Slop catalog](https://impeccable.style/slop/). Each finding links to a relevant Impeccable GitHub skill command. It does not run Impeccable's full detector or make judgment-only findings automatically.
 The result shows the percentage of those 35 detectable cues matched by the delivered source. This is a pattern-coverage measure, not a probability of AI authorship. After loading, a centered page preview receives the stamp; findings appear as the presentation fades into the normal report layout.
@@ -38,7 +38,7 @@ E2E starts its own fixture and app servers on ports 3201 and 3100. Stop manually
 
 The initial commit is the PRD/ARD/SDD/TDD specification starter and repository policy. Implementation is developed during the hackathon on separate feature branches: local URL policy, browser observation and action guard, schema-validated reasoning adapter, outcome evaluation and replay, evidence report, UI, and synthetic demo fixture. Dependencies include Next.js, React, Playwright, Zod, Vitest, TypeScript, and ESLint; they are third-party software, not project-authored code. The broken registration endpoint is an intentional fixture, not a GhostQA-discovered production defect.
 
-The default reasoning mode is a deterministic mock. The Meta adapter fails closed because its current API contract and live credentials have not been verified. `npm run test:smoke:meta` intentionally reports that block. A mock run must not be presented as a real Meta-model test.
+The default reasoning mode is a deterministic mock. The Meta adapter requires `MODEL_API_KEY`; without it, `npm run test:smoke:meta` reports that the live smoke test was not run. A mock run must not be presented as a real Meta-model test.
 
 ## Safety and limits
 
