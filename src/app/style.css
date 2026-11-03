@@ -111,19 +111,10 @@ body {
 }
 
 .brand-mark {
-  position: relative;
-  display: grid;
-  place-items: center;
+  display: block;
   width: 42px;
   height: 42px;
   flex: none;
-  border: 1px solid rgba(20, 184, 166, 0.45);
-  border-radius: 14px;
-  background: var(--accent-dim);
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: -0.06em;
 }
 
 .brand-scan-ring {
@@ -169,10 +160,6 @@ body {
     opacity: 0;
     transform: scale(1.26);
   }
-}
-
-.brand-mark span {
-  color: var(--accent);
 }
 
 .brand-copy {
