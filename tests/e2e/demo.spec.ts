@@ -1,8 +1,44 @@
 import { expect, test } from '@playwright/test';
 
-test('workspace layout keeps progress and content readable on desktop and mobile', async ({ page }) => {
+test('landing introduces GhostQA and enters the dashboard on desktop and mobile', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
+  await expect(page.locator('.entry-brand img[src="/ghostqa-mark.svg"]')).toBeVisible();
+  await expect(page.locator('link[rel="icon"][href="/ghostqa-mark.svg"]')).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: /Find what your website hides/i })).toBeVisible();
+  await expect(page.getByText('THE CHECK', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /My official entry for the Meta Global AI Developer Hackathon/i })).toHaveAttribute('href', 'https://cerebralvalley.ai/e/meta-ai-developer-hackathon/');
+  expect(await page.locator('.entry-note-lead').evaluate((node) => getComputedStyle(node).borderLeftWidth)).toBe('0px');
+  await expect(page.getByRole('link', { name: /Open dashboard/i }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open dashboard/i }).first().locator('svg')).toBeVisible();
+  await expect(page.getByText('ONE SITE. ONE RUN. CLEAR EVIDENCE.')).toHaveCount(0);
+  await expect(page.getByText('GHOSTQA / LIVE OBSERVATION')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Illustration of a GhostQA website review' })).toBeVisible();
+  await expect(page.locator('.entry-globe')).toBeVisible();
+  await expect(page.locator('.entry-website .entry-demo-cta')).toBeVisible();
+  await expect(page.locator('.entry-site-logo')).toHaveText('demo.');
+  expect(await page.locator('.entry-website').evaluate((node) => getComputedStyle(node).borderTopLeftRadius)).toBe('0px');
+  await page.locator('.entry-demo-cta').hover();
+  await expect(page.locator('.entry-demo-cta')).toHaveCSS('box-shadow', /rgba/);
+  expect(await page.locator('.entry-scan').evaluate((node) => getComputedStyle(node).animationIterationCount)).toBe('infinite');
+  expect(await page.locator('.entry-website').evaluate((node) => getComputedStyle(node).animationIterationCount)).toBe('infinite');
+  await expect(page.locator('.entry-form')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Try GhostQA/i })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(900);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
+  await page.setViewportSize({ width: 375, height: 667 });
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(667);
+  await page.getByRole('link', { name: /Open dashboard/i }).first().click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole('button', { name: 'Go to test workspace' })).toBeVisible();
+});
+
+test('workspace layout keeps progress and content readable on desktop and mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/dashboard');
+  await expect(page.locator('.app-header img[src="/ghostqa-mark.svg"]')).toBeVisible();
   await expect(page.locator('header')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: 'Test workspace' })).toHaveCount(0);
   const contentHeader = page.locator('.main-content').getByRole('region', { name: 'GhostQA overview' });
@@ -63,7 +99,7 @@ test('workspace layout keeps progress and content readable on desktop and mobile
 });
 
 test('seeded registration failure is replayed and reported with evidence', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('dialog', { name: 'Live evaluation preview' })).toBeVisible();
@@ -100,7 +136,7 @@ test('masked page observation streams before the final result', async ({ request
 });
 
 test('healthy demo flow has no fabricated finding', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await expect(page.getByRole('group', { name: 'Common functional test goals' })).toBeVisible();
   await page.getByRole('button', { name: 'Page health & console' }).click();
@@ -117,7 +153,7 @@ test('healthy demo flow has no fabricated finding', async ({ page }) => {
 });
 
 test('AI slop review stamps only a rendered-design verdict, with guideline cues as support', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Review type').selectOption('slop');
   await expect(page.getByLabel('Local demo URL')).toHaveValue('http://127.0.0.1:3201/slop');
@@ -165,7 +201,7 @@ test('AI slop review stamps only a rendered-design verdict, with guideline cues 
 });
 
 test('external URL is rejected before a browser run', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Local demo URL').fill('https://example.com');
   await page.getByRole('button', { name: 'Start test' }).click();
@@ -174,7 +210,7 @@ test('external URL is rejected before a browser run', async ({ page }) => {
 });
 
 test('technical review shows read-only observations without a bypass claim', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Review type').selectOption('technical');
   await page.getByRole('button', { name: 'Start test' }).click();
