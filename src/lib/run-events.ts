@@ -30,7 +30,7 @@ export type LiveEvaluationNarrative = {
 };
 
 export function describeLiveEvaluation(input: {
-  mode: 'test' | 'slop';
+  mode: 'test' | 'slop' | 'technical';
   url: string;
   status: string;
   log: string[];
@@ -44,6 +44,13 @@ export function describeLiveEvaluation(input: {
   const target = (spaceIdx === -1 ? '' : cleaned.slice(spaceIdx + 1).trim()) || url;
 
   const s = status.toLowerCase();
+
+  if (mode === 'technical') return {
+    headline: 'Reviewing page delivery and security signals',
+    where: `Captured same-origin responses on ${target}`,
+    what: 'Inspecting delivered HTML/CSS/JS and bounded load metadata without submitting forms or probing links.',
+    actionTag: status || 'Technical review',
+  };
 
   if (mode === 'slop') {
     return {

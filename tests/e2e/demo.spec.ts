@@ -21,6 +21,18 @@ test('workspace layout keeps progress and content readable on desktop and mobile
   const demoCursor = designDemo.getByTestId('demo-agent-cursor');
   await expect(demoCursor).toBeVisible();
   expect(await demoCursor.evaluate((node) => getComputedStyle(node).animationIterationCount)).toBe('infinite');
+  await expect(page.locator('.eyebrow, .tagline-kicker, .demo-state-pill, .demo-web-pill, .demo-badge-alert, .workspace-limit')).toHaveCount(0);
+  await expect(designDemo).toHaveAttribute('data-mode', 'problem');
+  await tagline.getByRole('button', { name: /See how GhostQA verifies it/i }).click();
+  await expect(designDemo).toHaveAttribute('data-mode', 'solution');
+  await expect(designDemo.getByTestId('demo-evidence')).toBeVisible();
+  await tagline.getByRole('button', { name: /Watch what users hit/i }).click();
+  await expect(designDemo).toHaveAttribute('data-mode', 'problem');
+  await designDemo.getByRole('button', { name: /Press “Create account”/i }).click();
+  await expect(designDemo).toHaveAttribute('data-step', '2');
+  await expect(designDemo.locator('.demo-step-callout')).toContainText('Form submits POST /api/register');
+  const sidebarNav = page.getByRole('navigation', { name: 'Primary' });
+  await expect(sidebarNav.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
   const jumpButton = contentHeader.getByRole('button', { name: 'Go to test workspace' });
   await expect(jumpButton).toBeVisible();
   await jumpButton.click();
@@ -45,6 +57,8 @@ test('workspace layout keeps progress and content readable on desktop and mobile
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('status', { name: 'Run progress' })).toBeVisible();
+  await expect(sidebarNav.getByRole('button', { name: 'Overview' })).toBeVisible();
+  await expect(sidebarNav.getByRole('button', { name: 'Workspace' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
@@ -157,4 +171,14 @@ test('external URL is rejected before a browser run', async ({ page }) => {
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('status')).toHaveText('Only the configured local demo URL is allowed');
   await expect(page.getByText('Actions will appear here as they run.')).toBeVisible();
+});
+
+test('technical review shows read-only observations without a bypass claim', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Go to test workspace' }).click();
+  await page.getByLabel('Review type').selectOption('technical');
+  await page.getByRole('button', { name: 'Start test' }).click();
+  await expect(page.getByRole('heading', { name: 'Technical observations' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText('Findings are signals, not verified exploits or compliance verdicts.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Technical observations' })).toContainText('Debug or test code in delivered script');
 });
