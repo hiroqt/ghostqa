@@ -4,7 +4,7 @@ import OpenAI from 'openai';
 
 const apiKey = process.env.MODEL_API_KEY;
 const baseURL = process.env.MODEL_BASE_URL ?? 'https://api.meta.ai/v1';
-const model = process.env.MODEL_ID ?? 'muse-spark-1.3';
+const model = process.env.MODEL_ID ?? 'muse-wonder-1.0';
 
 if (!apiKey) {
   console.error('NOT RUN: set MODEL_API_KEY to run the live Meta Model API smoke test.');

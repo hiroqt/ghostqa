@@ -216,14 +216,21 @@ export function auditRenderedDesign(page: RenderedPage): Omit<DesignFinding, 'su
   return signals.sort((a, b) => b.weight - a.weight);
 }
 
-export function reviewDesign(page: RenderedPage | null, sources: DeliveredSource[]): DesignReview {
+// Accepts one capture or several captures of the same page. With several, a
+// design signal counts only when every capture measured it, so a verdict never
+// rests on content that shifted between captures (lazy loads, rotating ads).
+export function reviewDesign(input: RenderedPage | null | Array<RenderedPage | null>, sources: DeliveredSource[]): DesignReview {
   const patternReview = reviewSlopPatterns(sources);
   const supportingCues = matchSlopPatterns(sources);
   const patternStory = patternReview.status === 'story';
-  if (!page || page.texts.length < 3) {
+  const pages = Array.isArray(input) ? input : [input];
+  if (pages.length === 0 || pages.some((page) => !page || page.texts.length < 3)) {
     return { verdict: 'insufficient-evidence', designScore: 0, confidence: 'low', designFindings: [], patternReview, supportingCues };
   }
-  const designFindings = auditRenderedDesign(page).map((signal) => ({
+  const [first, ...rest] = (pages as RenderedPage[]).map(auditRenderedDesign);
+  const stable = first.filter((signal) => rest.every((other) => other.some((candidate) => candidate.id === signal.id)));
+  const unstable = stable.length < first.length || rest.some((other) => other.length > stable.length);
+  const designFindings = stable.map((signal) => ({
     ...signal,
     supportedBy: supportingCues.filter((cue) => SUPPORT[signal.id]?.includes(cue.id)).map((cue) => cue.title),
   }));
@@ -237,7 +244,7 @@ export function reviewDesign(page: RenderedPage | null, sources: DeliveredSource
     : verdict === 'mixed' ? (patternStory ? 'medium' : 'low')
       : verdict === 'ai-slop-pattern' ? 'medium'
         : supportingCues.length ? 'medium' : 'high';
-  return { verdict, designScore, confidence, designFindings, patternReview, supportingCues };
+  return { verdict, designScore, confidence: unstable ? 'low' : confidence, designFindings, patternReview, supportingCues };
 }
 
 export function buildDesignAgentGuide(review: DesignReview): string {

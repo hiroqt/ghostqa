@@ -103,7 +103,9 @@ export class MockAdapter implements ReasoningAdapter {
 }
 
 const DEFAULT_BASE_URL = 'https://api.meta.ai/v1';
-const DEFAULT_MODEL_ID = 'muse-spark-1.3';
+const DEFAULT_MODEL_ID = 'muse-wonder-1.0';
+// Meta accepts a deprecated `seed` for best-effort reproducibility; results may still vary.
+const DEFAULT_SEED = 7;
 
 // Minimal structural type for the parts of the OpenAI client we use. Keeping it
 // narrow lets unit tests inject a mock without a real network client.
@@ -119,6 +121,7 @@ export type MetaAdapterOptions = {
   apiKey?: string;
   baseURL?: string;
   model?: string;
+  seed?: number;
   client?: ChatCompletionsClient;
 };
 
@@ -138,10 +141,13 @@ const SYSTEM_PROMPT = [
 export class MetaAdapter implements ReasoningAdapter {
   private readonly client: ChatCompletionsClient;
   private readonly model: string;
+  private readonly seed: number;
 
   constructor(options: MetaAdapterOptions = {}) {
     const apiKey = options.apiKey ?? process.env.MODEL_API_KEY;
     this.model = options.model ?? process.env.MODEL_ID ?? DEFAULT_MODEL_ID;
+    const envSeed = Number.parseInt(process.env.MODEL_SEED ?? '', 10);
+    this.seed = options.seed ?? (Number.isFinite(envSeed) ? envSeed : DEFAULT_SEED);
     if (options.client) {
       this.client = options.client;
     } else {
@@ -178,6 +184,7 @@ export class MetaAdapter implements ReasoningAdapter {
 
       const response = await this.client.chat.completions.create({
         model: this.model,
+        seed: this.seed,
         messages: [{ role: 'user', content: parts }],
       });
       const content = response.choices?.[0]?.message?.content;
@@ -224,6 +231,7 @@ export class MetaAdapter implements ReasoningAdapter {
 
     const response = await this.client.chat.completions.create({
       model: this.model,
+      seed: this.seed,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: parts },

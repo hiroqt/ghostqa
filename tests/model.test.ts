@@ -55,7 +55,8 @@ describe('GQ-003 reasoning adapter', () => {
     expect(await adapter.decide(context)).toEqual(decision);
     expect(create).toHaveBeenCalledTimes(1);
     const args = create.mock.calls[0][0];
-    expect(args.model).toBe('muse-spark-1.3');
+    expect(args.model).toBe('muse-wonder-1.0');
+    expect(args.seed).toBe(7);
   });
 
   it('attaches a screenshot as an image_url item when the file exists', async () => {

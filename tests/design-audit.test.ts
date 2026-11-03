@@ -140,3 +140,23 @@ test('agent guide leads with the design verdict and keeps guideline cues as supp
   expect(guide).toContain('**Supported by guidelines:** Repeated card grid');
   expect(guide).not.toContain("console.log('x')");
 });
+
+test('GQ-011 consistency: two identical captures give the same verdict as one', () => {
+  expect(reviewDesign([slopPage, slopPage], sourcePatterns)).toEqual(reviewDesign(slopPage, sourcePatterns));
+});
+
+test('GQ-011 consistency: only design signals measured in every capture count', () => {
+  const plain: RenderedPage = {
+    viewport,
+    elements: [el('BODY', [0, 0, 1280, 900])],
+    texts: [text([80, 40, 600, 64], { 'font-size': '56px' }), text([80, 140, 400, 28], { 'font-size': '22px' }), text([80, 190, 480, 24])],
+  };
+  const review = reviewDesign([slopPage, plain], sourcePatterns);
+  expect(review.verdict).not.toBe('ai-slop-design');
+  expect(review.designFindings).toEqual([]);
+  expect(review.confidence).toBe('low');
+});
+
+test('GQ-011 consistency: a missing capture yields insufficient evidence', () => {
+  expect(reviewDesign([slopPage, null], sourcePatterns).verdict).toBe('insufficient-evidence');
+});
