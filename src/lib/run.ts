@@ -12,6 +12,7 @@ import { replayOnce } from './replay';
 import { buildReport, type RunReport } from './report';
 import { parseDomSnapshot, RENDERED_STYLE_PROPERTIES, reviewDesign, VERDICT_LABELS } from './design-audit';
 import { type DeliveredSource } from './slop-review';
+import { reviewTechnical } from './technical-review';
 
 type Emit = (event: Record<string, unknown>) => void;
 const paceStep = () => new Promise<void>((resolve) => setTimeout(resolve, process.env.VITEST ? 0 : 280));
@@ -43,7 +44,7 @@ function selectAdapter(url: string, goal: string, liveMode = false): ReasoningAd
   return new MockAdapter(demoDecisions(url, goal, liveMode));
 }
 
-export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test' | 'slop' = 'test'): Promise<{ report: RunReport; screenshot?: string; highlight?: { x: number; y: number; width: number; height: number } }> {
+export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test' | 'slop' | 'technical' = 'test'): Promise<{ report: RunReport; screenshot?: string; highlight?: { x: number; y: number; width: number; height: number } }> {
   const liveMode = process.env.ALLOW_LIVE_SITES === 'true';
   const origin = new URL(url).origin;
   const gate = { allowedOrigins: [origin], actionCount: 0, startedAt: Date.now(), liveMode };
@@ -77,13 +78,21 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
     const activeBrowser = browser;
     timer = setTimeout(() => { void activeBrowser.close().catch(() => {}); }, Math.max(1, 60_000 - (Date.now() - gate.startedAt)));
     const context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
-    await installNetworkGuard(context, gate.allowedOrigins, liveMode, mode === 'slop');
+    await installNetworkGuard(context, gate.allowedOrigins, liveMode, mode !== 'test');
     const page = await context.newPage();
     const delivered: Promise<DeliveredSource | null>[] = [];
-    if (mode === 'slop') page.on('response', (response) => {
+    const technicalMetrics = { resources: 0, bytes: 0, largestBytes: 0, loadMs: 0, headers: {} as Record<string, string> };
+    const navigationStarted = Date.now();
+    if (mode === 'technical') page.once('load', () => { technicalMetrics.loadMs = Date.now() - navigationStarted; });
+    if (mode !== 'test') page.on('response', (response) => {
       const resourceUrl = new URL(response.url());
       const type = response.headers()['content-type'] ?? '';
       const size = Number(response.headers()['content-length'] ?? 0);
+      if (mode === 'technical' && resourceUrl.origin === origin) {
+        technicalMetrics.resources++;
+        if (Number.isFinite(size) && size > 0) { technicalMetrics.bytes += size; technicalMetrics.largestBytes = Math.max(technicalMetrics.largestBytes, size); }
+        if (response.request().isNavigationRequest() && response.request().frame() === page.mainFrame()) technicalMetrics.headers = response.headers();
+      }
       if (resourceUrl.origin !== origin || response.status() >= 400 || size > 200_000) return;
       const kind: DeliveredSource['kind'] | null = /text\/html/i.test(type) ? 'html' : /text\/css/i.test(type) ? 'css' : /(?:javascript|ecmascript)/i.test(type) ? 'js' : null;
       if (kind && delivered.length < 20) delivered.push(response.text().then((text) => text.length <= 200_000 ? { kind, text } : null).catch(() => null));
@@ -115,7 +124,7 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
     const previewSent = await emitObservation(observation.screenshotPath);
     await paceStep();
 
-    if (mode === 'slop') {
+    if (mode !== 'test') {
       if (!previewSent) {
         const image = await page.screenshot({ type: 'jpeg', quality: 45, mask: [page.locator('input,textarea,select,[data-private]')], animations: 'disabled' });
         if (image.length <= 500_000) emit({ type: 'observation', screenshot: `data:image/jpeg;base64,${image.toString('base64')}` });
@@ -125,8 +134,16 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
       await page.waitForLoadState('load', { timeout: 3_000 }).catch(() => {});
       const sources = (await Promise.all(delivered)).filter((source): source is DeliveredSource => source !== null);
       if (!sources.some((source) => source.kind === 'html')) sources.push({ kind: 'html', text: (await page.content()).slice(0, 200_000) });
+      if (mode === 'technical') {
+        const technicalReview = reviewTechnical(sources, technicalMetrics);
+        const base = buildReport({ status: 'no-finding', reason: 'Technical review completed', trace });
+        return { report: { ...base, status: 'review', markdown: 'Read-only technical review completed; observations require verification.', technicalReview } };
+      }
       // CDP DOM snapshot reads computed styles and layout without running page JavaScript.
-      const rendered = await (async () => {
+      // Let the page settle, then capture twice; reviewDesign keeps only signals
+      // present in both captures so shifting content cannot flip the verdict.
+      await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => {});
+      const capture = () => (async () => {
         const cdp = await context.newCDPSession(page);
         let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
         try {
@@ -140,6 +157,9 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
           await cdp.detach().catch(() => {});
         }
       })().catch(() => null);
+      const firstCapture = await capture();
+      await page.waitForTimeout(800);
+      const rendered = [firstCapture, await capture()];
       emit({ type: 'status', message: 'Reviewing delivered source' });
       await paceStep();
       const designReview = reviewDesign(rendered, sources);

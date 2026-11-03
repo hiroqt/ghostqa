@@ -15,3 +15,5 @@ Out of scope: generic natural-language assertion parsing, model-only verificatio
 Open questions (BLOCK implementation if material): none for the supported demo; other websites need an explicit assertion contract.
 
 Evidence log: RED `npx vitest run tests/evaluator.test.ts` exited 1 because `src/lib/evaluator.ts` did not exist. GREEN focused test passed 6/6. `npm run check` exited 0 and `npm run test` exited 0 (29/29). Browser E2E awaits the completed run controller.
+
+Evidence hardening (2026-11-03, user-requested consistency work): `/favicon.ico` failures are never functional evidence, and `verified` additionally requires the single fresh replay to show the same actual heading as the original run. Still exactly one replay (AGENTS.md cap). RED: 2 new tests in `tests/evaluator.test.ts` failed; GREEN: `npm run test` 121/121.

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 // Mock the run loop so route tests exercise URL policy + allowlist wiring only,
 // never launching a real browser against a public origin.
-const runDemo = vi.fn(async (_url: string, _goal: string, emit: (event: Record<string, unknown>) => void, _mode?: 'test' | 'slop') => {
+const runDemo = vi.fn(async (_url: string, _goal: string, emit: (event: Record<string, unknown>) => void, _mode?: 'test' | 'slop' | 'technical') => {
   void _mode;
   emit({ type: 'done', report: { status: 'no-finding' } });
   return { report: { status: 'no-finding' } } as never;
@@ -105,4 +105,40 @@ test('slop review admits a public URL only in live mode', async () => {
   const privateResponse = await POST(makeRequest({ url: 'http://127.0.0.1:8080/', mode: 'slop' }));
   expect(privateResponse.status).toBe(400);
   expect(runDemo).not.toHaveBeenCalled();
+});
+
+test('technical review routes through the same admitted origin', async () => {
+  const response = await POST(makeRequest({ url: 'http://127.0.0.1:3001/slop', mode: 'technical' }));
+  expect(response.status).toBe(200);
+  expect(runDemo).toHaveBeenCalledWith('http://127.0.0.1:3001/slop', '', expect.any(Function), 'technical');
+  await drain(response);
+});
+
+test('technical review admits one public origin only in explicit live mode', async () => {
+  process.env.ALLOW_LIVE_SITES = 'true';
+  const response = await POST(makeRequest({ url: 'https://example.com/', mode: 'technical' }));
+  expect(response.status).toBe(200);
+  expect(runDemo).toHaveBeenCalledWith('https://example.com/', '', expect.any(Function), 'technical');
+  await drain(response);
+  runDemo.mockClear();
+  const privateResponse = await POST(makeRequest({ url: 'http://127.0.0.1:8080/', mode: 'technical' }));
+  expect(privateResponse.status).toBe(400);
+  expect(runDemo).not.toHaveBeenCalled();
+});
+
+test('client cancellation does not leave the run locked or close the stream twice', async () => {
+  let finish: (() => void) | undefined;
+  runDemo.mockImplementationOnce(async (_url, _goal, emit) => {
+    await new Promise<void>((resolve) => { finish = resolve; });
+    emit({ type: 'status', message: 'Late result' });
+    return { report: { status: 'no-finding' } } as never;
+  });
+  const response = await POST(makeRequest({ url: 'http://127.0.0.1:3001/health' }));
+  await response.body?.cancel();
+  finish?.();
+  await vi.waitFor(async () => {
+    const next = await POST(makeRequest({ url: 'http://127.0.0.1:3001/health' }));
+    expect(next.status).toBe(200);
+    await drain(next);
+  });
 });

@@ -1,5 +1,6 @@
 import type { ActionTrace, Observation, ProposedAction, Suggestion } from './contracts';
 import type { DesignReview } from './design-audit';
+import type { TechnicalReview } from './technical-review';
 
 type PlainOutcome = { status: 'no-finding' | 'inconclusive'; reason: string; trace: ActionTrace[] };
 type VerifiedOutcome = {
@@ -23,7 +24,7 @@ type Finding = {
   replaySteps: ProposedAction[];
   reproductionTest: string;
 };
-export type RunReport = { status: PlainOutcome['status'] | 'verified' | 'review' | 'insufficient-evidence'; markdown: string; trace: SafeTrace[]; finding?: Finding; suggestions?: Suggestion[]; designReview?: DesignReview };
+export type RunReport = { status: PlainOutcome['status'] | 'verified' | 'review' | 'insufficient-evidence'; markdown: string; trace: SafeTrace[]; finding?: Finding; suggestions?: Suggestion[]; designReview?: DesignReview; technicalReview?: TechnicalReview };
 
 function cleanUrl(input: string): string {
   const url = new URL(input);

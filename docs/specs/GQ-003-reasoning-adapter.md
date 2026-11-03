@@ -12,7 +12,8 @@ Live Meta Model API (Muse Spark) integration:
 - SDK: the official `openai` npm package, pointed at the base URL: `new OpenAI({ baseURL, apiKey })`.
 - Auth: `MODEL_API_KEY` env var, passed explicitly as `apiKey` (the SDK does not read it on its own).
 - Wire format: Chat Completions — `client.chat.completions.create({ model, messages })`. Stateless, so the full conversation/trace is re-sent each turn. Response text is at `response.choices[0].message.content`.
-- Model ID: `muse-spark-1.3`, configurable via `MODEL_ID` (default `muse-spark-1.3`).
+- Model ID: `muse-wonder-1.0`, configurable via `MODEL_ID` (default `muse-wonder-1.0`; smoke-tested live 2026-11-03 with text, screenshot image input, and `seed`).
+- Every request sends a fixed `seed` (`MODEL_SEED`, default 7). Meta currently marks this parameter deprecated and guarantees no determinism; verification never depends on the model.
 - Image input is optional. The sanitized DOM text is always sent as a `{ type: 'text', text }` content item; when a screenshot file exists it is base64-encoded and attached as `{ type: 'image_url', image_url: { url: 'data:image/png;base64,<bytes>' } }`. Text-only is a valid fallback when no screenshot is available.
 Happy-path example: a mock decision to click a registration button is returned as a typed action.
 Failure-path example: `{ kind: 'action', action: { type: 'delete' } }` is rejected, leaving the browser untouched.

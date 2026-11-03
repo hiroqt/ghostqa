@@ -11,7 +11,10 @@ import { describeLiveEvaluation, readRunEvents } from '../lib/run-events';
 import { FindingCard } from '../components/FindingCard';
 import { NoFindingState } from '../components/NoFindingState';
 import { SlopReviewStory } from '../components/SlopReviewStory';
+import { TechnicalReview } from '../components/TechnicalReview';
+import { LandingShowcase } from '../components/LandingShowcase';
 import './style.css';
+import './interactive.css';
 
 const liveMode = process.env.NEXT_PUBLIC_ALLOW_LIVE_SITES === 'true';
 const demoOrigin = process.env.NEXT_PUBLIC_DEMO_ORIGIN ?? 'http://127.0.0.1:3001';
@@ -64,7 +67,7 @@ function isAnimatingStage(stage: Stage): boolean {
 export default function Home() {
   const [url, setUrl] = useState(liveMode ? '' : `${demoOrigin}/register`);
   const [goal, setGoal] = useState(liveMode ? '' : 'Try registering');
-  const [reviewType, setReviewType] = useState<'test' | 'slop'>('test');
+  const [reviewType, setReviewType] = useState<'test' | 'slop' | 'technical'>('test');
   const [status, setStatus] = useState('Ready');
   const [running, setRunning] = useState(false);
   const [log, setLog] = useState<string[]>([]);
@@ -80,6 +83,7 @@ export default function Home() {
   const [activeStage, setActiveStage] = useState<Stage>('Idle');
   const [completedStages, setCompletedStages] = useState<Set<Stage>>(new Set());
   const [showWorkspace, setShowWorkspace] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   function goToWorkspace() {
     setShowWorkspace(true);
@@ -203,7 +207,7 @@ export default function Home() {
   const narrative = describeLiveEvaluation({ mode: reviewType, url, status, log });
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
       {running && (
         <div className="slop-loading eval-theater" role="dialog" aria-modal="false" aria-label="Live evaluation preview">
           <div className="eval-theater-shell">
@@ -211,11 +215,11 @@ export default function Home() {
               <div className="eval-theater-title">
                 <span className="slop-loading-mark" aria-hidden="true">GQ</span>
                 <div>
-                  <span className="eval-stage-pill">{activeStage} · {status}</span>
+                  <span className="eval-stage-text">{activeStage} — {status}</span>
                   <strong>{narrative.headline}</strong>
                 </div>
               </div>
-              <span className="eval-action-chip">{narrative.actionTag}</span>
+              <code className="eval-action-text">{narrative.actionTag}</code>
             </div>
 
             <ol className="eval-stepper" aria-label="Evaluation stage progress">
@@ -236,7 +240,6 @@ export default function Home() {
                 <div className="eval-browser-bar" aria-hidden="true">
                   <span className="eval-dots"><i /><i /><i /></span>
                   <code className="eval-address">{url}</code>
-                  <span className="eval-live-badge">● LIVE CHROMIUM</span>
                 </div>
                 <div className="eval-viewport">
                   {preview ? (
@@ -302,16 +305,26 @@ export default function Home() {
       </div>
 
       {/* ─── Sidebar ────────────────────────────────────────────────── */}
-      <aside className="sidebar" aria-label="Run progress">
+      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} aria-label="Run progress">
+        <nav className="sidebar-nav" aria-label="Primary">
+          <button type="button" className="sidebar-nav-item" aria-current={!showWorkspace ? 'page' : undefined} onClick={() => setShowWorkspace(false)} disabled={running} title="Overview">
+            <span className="nav-glyph" aria-hidden="true">◐</span><span className="nav-label">Overview</span>
+          </button>
+          <button type="button" className="sidebar-nav-item" aria-current={showWorkspace ? 'page' : undefined} onClick={goToWorkspace} title="Workspace">
+            <span className="nav-glyph" aria-hidden="true">▣</span><span className="nav-label">Workspace</span>
+          </button>
+        </nav>
         <div className="sidebar-overview">
-          <div className="sidebar-title">Current run</div>
+          <span className="sidebar-caption">Current run</span>
           <strong>{activeStage === 'Idle' ? 'Ready to test' : activeStage}</strong>
-          <span>{activeIndex} of {ALL_STAGES.length - 1} stages</span>
           <div className="progress-bar-wrap" aria-hidden="true">
             <div className="progress-bar-fill" style={{ width: `${progressPct}%` }} />
           </div>
+          <div className="sidebar-meters">
+            <span>Stage <b>{activeIndex}/{ALL_STAGES.length - 1}</b></span>
+            <span>Actions <b>{log.length}/10</b></span>
+          </div>
         </div>
-        <div className="sidebar-title">Run stages</div>
         <div>
           <ul className="sidebar-stages" role="list">
             {ALL_STAGES.map((stage) => {
@@ -324,6 +337,7 @@ export default function Home() {
                 <li
                   key={stage}
                   className={`sidebar-stage ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+                  title={stage}
                   aria-current={isActive ? 'step' : undefined}
                   aria-label={`${stage}${stateLabel}`}
                 >
@@ -340,160 +354,31 @@ export default function Home() {
             })}
           </ul>
         </div>
-        <div className="sidebar-note">One site · One bounded run</div>
+        <button
+          type="button"
+          className="sidebar-collapse"
+          aria-expanded={!sidebarCollapsed}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={() => setSidebarCollapsed((c) => !c)}
+        >
+          <span aria-hidden="true">{sidebarCollapsed ? '»' : '«'}</span>
+          <span className="nav-label">Collapse</span>
+        </button>
       </aside>
 
       {/* ─── Main content ───────────────────────────────────────────── */}
       <main className="main-content" id="main-content">
         <div className="shell">
           {!showWorkspace ? (
-            <section className="panel content-hero" aria-label="GhostQA overview">
-              <div className="hero-showcase">
-                <div className="hero-left-col">
-                  <section className="tagline-stack" aria-label="Problem and solution tagline">
-                    <div className="tagline-card tagline-problem">
-                      <span className="tagline-kicker">THE PROBLEM</span>
-                      <p className="landing-problem-lead">
-                        <strong>
-                          AI-generated websites are everywhere — but are you sure yours actually works?
-                        </strong>
-                      </p>
-                      <p>
-                        Surface demos pass a quick glance while sign-up forms return <code>HTTP 500</code> and generic AI-slop layouts ship unmeasured.
-                      </p>
-                    </div>
-                    <div className="tagline-card tagline-solution">
-                      <span className="tagline-kicker">THE SOLUTION</span>
-                      <p>
-                        <strong>
-                          GhostQA runs guarded Chromium checks and rendered-design audits to deliver replay-verified evidence, not guesswork.
-                        </strong>{' '}
-                        Every finding is backed by a masked screenshot, deterministic replay from a fresh context, or measured computed styles.
-                      </p>
-                    </div>
-                  </section>
-                  <div className="hero-cta-row">
-                    <button type="button" className="hero-workspace-cta" onClick={goToWorkspace}>
-                      Go to test workspace
-                    </button>
-                    <span className="muted">One bounded Chromium session · 10 actions max</span>
-                  </div>
-                </div>
-
-                <section
-                  className="design-demo-card"
-                  aria-label="Animated design and workflow verification demo"
-                >
-                  <div className="demo-chrome-bar" aria-hidden="true">
-                    <span className="eval-dots"><i /><i /><i /></span>
-                    <code className="demo-chrome-url">http://127.0.0.1:3001/register</code>
-                    <span className="demo-state-pill">● LIVE WEB PREVIEW</span>
-                  </div>
-                  <div className="demo-stage-canvas">
-                    <div className="demo-site-canvas" aria-hidden="true">
-                      <div className="demo-site-nav" data-testid="demo-web-navbar">
-                        <span className="demo-site-brand">
-                          <i className="demo-brand-dot" />
-                          AcmeCloud
-                        </span>
-                        <div className="demo-site-links">
-                          <span>Features</span>
-                          <span>Pricing</span>
-                          <span className="active">Sign up</span>
-                        </div>
-                      </div>
-
-                      <div className="demo-web-hero" data-testid="demo-web-hero">
-                        <div className="demo-web-hero-copy">
-                          <span className="demo-web-pill">NEW RELEASE</span>
-                          <div className="demo-web-h1">Ship faster with AI</div>
-                          <div className="demo-web-line w-90" />
-                          <div className="demo-web-line w-70" />
-                          <div className="demo-verdict-row">
-                            <span className="demo-badge-alert">500 REPLAY VERIFIED</span>
-                            <span className="demo-badge-ok">CSS MEASURED</span>
-                          </div>
-                        </div>
-
-                        <div className="demo-mock-form">
-                          <div className="demo-mock-input demo-target-email">
-                            <span>Email</span>
-                            <code>alex@demo.local</code>
-                          </div>
-                          <div className="demo-mock-input masked demo-target-password">
-                            <span>Pass</span>
-                            <code>••••••••</code>
-                          </div>
-                          <div className="demo-mock-cta demo-target-submit">
-                            Create account → 500
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="demo-web-cards" data-testid="demo-web-cards">
-                        <div className="demo-web-card demo-card-1">
-                          <div className="demo-card-head">
-                            <span className="demo-card-icon" />
-                            <span className="demo-card-tag">gap: 16px</span>
-                          </div>
-                          <div className="demo-web-line w-80" />
-                          <div className="demo-web-line w-60" />
-                        </div>
-                        <div className="demo-web-card demo-card-2">
-                          <div className="demo-card-head">
-                            <span className="demo-card-icon" />
-                            <span className="demo-card-tag">radius: 14px</span>
-                          </div>
-                          <div className="demo-web-line w-85" />
-                          <div className="demo-web-line w-65" />
-                        </div>
-                        <div className="demo-web-card demo-card-3">
-                          <div className="demo-card-head">
-                            <span className="demo-card-icon" />
-                            <span className="demo-card-tag">contrast: AA</span>
-                          </div>
-                          <div className="demo-web-line w-75" />
-                          <div className="demo-web-line w-55" />
-                        </div>
-                      </div>
-
-                      <div
-                        className="demo-agent-cursor"
-                        data-testid="demo-agent-cursor"
-                      >
-                        <span className="demo-cursor-ripple" />
-                        <svg
-                          className="demo-cursor-arrow"
-                          viewBox="0 0 24 24"
-                          width="20"
-                          height="20"
-                          fill="none"
-                        >
-                          <path
-                            d="M4 3L11.5 20L14.2 13.2L21 10.5L4 3Z"
-                            fill="#14b8a6"
-                            stroke="#0f0f12"
-                            strokeWidth="1.8"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        <span className="demo-cursor-tag">GhostQA</span>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            </section>
+            <LandingShowcase onStart={goToWorkspace} />
           ) : (
             <>
               <div id="test-workspace" ref={workspaceRef} className="workspace-intro">
                 <div className="workspace-intro-head">
                   <div>
-                    <div className="eyebrow">TEST CONSOLE</div>
                     <h2>Test workspace</h2>
-                    <p>Run a focused check and follow each browser action as it happens.</p>
+                    <p>Point GhostQA at one page, give it a goal, and watch each browser action as it happens.</p>
                   </div>
-                  <span className="workspace-limit">One site · 10 actions max</span>
                 </div>
               </div>
               <div className="workspace-grid">
@@ -503,12 +388,13 @@ export default function Home() {
                   <form onSubmit={start}>
                     <label htmlFor="review-type">Review type</label>
                     <select id="review-type" value={reviewType} onChange={(event) => {
-                      const next = event.target.value as 'test' | 'slop';
+                      const next = event.target.value as 'test' | 'slop' | 'technical';
                       if (!liveMode && url === `${demoOrigin}/${reviewType === 'test' ? 'register' : 'slop'}`) setUrl(`${demoOrigin}/${next === 'test' ? 'register' : 'slop'}`);
                       setReviewType(next);
                     }} disabled={running}>
                       <option value="test">Functional test</option>
                       <option value="slop">AI slop design and code review</option>
+                      <option value="technical">Technical security and performance review</option>
                     </select>
                     <label htmlFor="url">{liveMode ? 'Website URL' : 'Local demo URL'}</label>
                     <input
@@ -616,7 +502,9 @@ export default function Home() {
                     <strong className={`outcome ${report.status}`}>{report.status}</strong>
                   </div>
 
-                  {report.designReview ? (
+                  {report.technicalReview ? (
+                    <TechnicalReview review={report.technicalReview} />
+                  ) : report.designReview ? (
                     <SlopReviewStory review={report.designReview} />
                   ) : report.finding ? (
                     <FindingCard finding={report.finding} screenshot={screenshot} highlight={highlight} />

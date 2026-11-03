@@ -34,7 +34,8 @@ function newHttpFailure(before: Observation, after: Observation) {
       previous.set(key, count - 1);
       return false;
     }
-    return failure.status >= 400;
+    // Browser favicon probes are not application behavior and must never be bug evidence.
+    return failure.status >= 400 && !/\/favicon\.ico$/i.test(failure.url);
   });
 }
 
@@ -51,7 +52,7 @@ export function evaluateOutcome(input: { expectedText: string; before: Observati
 
   const replayHeadings = headings(replay.after);
   const replayFailure = newHttpFailure(replay.before, replay.after);
-  if (!replayHeadings || replayHeadings.includes(expectedText) ||
+  if (!replayHeadings || replayHeadings.includes(expectedText) || (replayHeadings[0] ?? 'No visible heading') !== base.actual ||
       !replayFailure || replayFailure.url !== failure.url || replayFailure.status !== failure.status) {
     return { ...base, status: 'inconclusive', httpFailure: failure };
   }

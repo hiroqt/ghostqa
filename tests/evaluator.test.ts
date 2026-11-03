@@ -53,3 +53,19 @@ describe('GQ-005 outcome evaluation', () => {
     expect(evaluateOutcome({ expectedText, before, after }).status).toBe('inconclusive');
   });
 });
+
+describe('GQ-005/006 evidence hardening', () => {
+  it('ignores favicon failures as functional evidence', () => {
+    const favicon = { url: 'http://127.0.0.1:3001/favicon.ico', status: 404 };
+    const before = observed(['Register']);
+    const after = observed(['Registration failed'], [favicon]);
+    expect(evaluateOutcome({ expectedText, before, after }).status).toBe('inconclusive');
+  });
+
+  it('requires the replay to show the same actual heading', () => {
+    const before = observed(['Register']);
+    const after = observed(['Registration failed'], [registrationFailure]);
+    const replay = { before: observed(['Register']), after: observed(['Something else'], [registrationFailure]) };
+    expect(evaluateOutcome({ expectedText, before, after, replay }).status).toBe('inconclusive');
+  });
+});
