@@ -38,5 +38,7 @@ One Chromium browser with one active context at a time (a fresh context for repl
 
 GQ-011 review may use one user-submitted public origin only when explicit live mode is enabled. It reuses the live URL admission policy, blocks cross-origin requests and non-GET/HEAD requests, and makes no model call or replay. The local fixture path allowlist remains the default.
 
+GQ-012 technical review reuses that single-page read-only capture. It derives masked static observations from delivered source and bounded response metadata; it does not request linked pages, submit forms, test credentials, or claim a bypass from a URL pattern. The report exposes no source text or secret values.
+
 ## Tradeoffs
 Use in-memory state for speed; no DB. Use one run at a time for reproducibility. Prefer explicit DOM locator references over model-generated CSS where possible. A seeded deterministic fixture is more defensible than arbitrary-site coverage.

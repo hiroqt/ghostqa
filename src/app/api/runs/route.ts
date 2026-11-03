@@ -10,7 +10,7 @@ let running = false;
 const runRequest = z.strictObject({
   url: z.string().max(2048),
   goal: z.string().max(200).optional(),
-  mode: z.enum(['test', 'slop']).optional(),
+  mode: z.enum(['test', 'slop', 'technical']).optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
