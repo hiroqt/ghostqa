@@ -65,9 +65,36 @@ The default reasoning mode is a deterministic mock. The Meta adapter requires `M
 
 ## Three-minute demo outline
 
-1. **0:00–0:30:** Show the local fixture and exact allowlisted URL; explain the intentionally broken registration endpoint.
-2. **0:30–1:45:** Run the registration goal; show the live trace, HTTP failure evidence, and single replay-backed finding.
-3. **1:45–2:25:** Show the screenshot references, expected/actual result, and generated Playwright reproduction.
-4. **2:25–3:00:** Run `/health` for a no-finding outcome, then reject an external URL and disclose mock Meta mode.
+### 1. Introduction — 0:00–0:25
+
+**On screen:** Open the GhostQA dashboard, then show the local demo page at `/register`.
+
+**Say:** “Hi, I’m presenting GhostQA, a browser-based QA tool for checking whether a web workflow actually works. It observes a real page, runs a small, guarded browser flow, and reports what it can verify. This demo uses a local synthetic fixture.”
+
+### 2. Problem we’re solving — 0:25–0:55
+
+**On screen:** Show the registration form and its failure message.
+
+**Say:** “A web app can look finished while an important action is broken. Here, the registration form appears normal, but submitting it fails. A screenshot or a model’s guess alone can’t establish what went wrong. Developers need evidence they can inspect and steps they can replay.”
+
+### 3. The solution — 0:55–1:25
+
+**On screen:** Show the dashboard’s Functional test selection, URL and goal fields, and run trace.
+
+**Say:** “GhostQA checks one allowed site at a time. It observes the page, takes policy-checked actions, and records the action trace and browser evidence. A suspected failure is retried once in a fresh browser context. GhostQA calls it verified only when the same failure is reproduced; otherwise it reports no finding or an inconclusive result. Runs are bounded to ten actions and sixty seconds.”
+
+### 4. The demo — 1:25–3:00
+
+**On screen:** In the dashboard, select **Functional test**, enter `http://127.0.0.1:3001/register`, keep the goal **Try registering**, and start the run. Show the live trace and result. If the run takes longer than the allotted segment, use a recording of this same local run for the result; do not imply a live result is prerecorded.
+
+**Say:** “I’ll ask GhostQA to try registering. It observes the page, enters synthetic form data, and submits through the browser. The trace shows the actions it took. The registration endpoint returns an HTTP 500 and a visible failure, where a confirmation was expected. GhostQA retries once from a fresh context and sees the same failure.”
+
+**On screen:** Point to the verified finding, expected and actual outcome, screenshot evidence, and reproduction steps or generated Playwright test.
+
+**Say:** “Here’s the result: the expected outcome was a registration confirmation; the observed outcome was a failure. The replay confirms the behavior, and the report includes evidence and reproduction steps so a developer can investigate. The fixture is intentionally broken, so this is a demonstration of verification—not a newly discovered production bug.”
+
+**On screen:** If time allows, run `http://127.0.0.1:3001/health` and show the no-finding result. End on the report or the GhostQA dashboard.
+
+**Say:** “On the healthy route, GhostQA should finish without inventing a bug. This build uses a deterministic mock reasoning adapter by default; I’m not presenting this as a live Meta model run. GhostQA’s aim is simple: make website checks bounded, reproducible, and grounded in browser evidence.”
 
 Read `docs/PRD.md`, `docs/ARD.md`, `docs/SDD.md`, `docs/TDD.md`, and `docs/specs/` for the requirement contracts. Do not commit `.env` or real credentials.
