@@ -8,7 +8,7 @@ const CYCLE_MS = 9000;
 
 const STEPS: Record<Mode, Array<{ label: string; detail: string }>> = {
   problem: [
-    { label: 'Fill email', detail: 'Visitor enters alex@demo.local' },
+    { label: 'Fill email', detail: 'Visitor enters alex@example.com' },
     { label: 'Fill password', detail: 'Password field accepts input' },
     { label: 'Press “Create account”', detail: 'Form submits POST /api/register' },
     { label: 'Spinner… then nothing', detail: 'Server returns 500; UI stays stuck' },
@@ -69,7 +69,7 @@ export function LandingShowcase({ onStart }: { onStart: () => void }) {
               <strong>AI-generated websites are everywhere — but are you sure yours actually works?</strong>
               <span className="ps-option-body">
                 <span>
-                  Surface demos pass a quick glance while sign-up forms quietly return <code>HTTP 500</code> and templated layouts ship unmeasured.
+                  Polished pages pass a quick glance while sign-up forms quietly return <code>HTTP 500</code> and templated layouts ship unmeasured.
                 </span>
               </span>
             </button>
@@ -104,11 +104,11 @@ export function LandingShowcase({ onStart }: { onStart: () => void }) {
           className="design-demo-card"
           data-mode={mode}
           data-step={pinnedStep !== null ? String(pinnedStep) : undefined}
-          aria-label="Animated design and workflow verification demo"
+          aria-label="Animated design and workflow verification"
         >
           <div className="demo-chrome-bar">
             <span className="eval-dots" aria-hidden="true"><i /><i /><i /></span>
-            <code className="demo-chrome-url">http://127.0.0.1:3001/register</code>
+            <code className="demo-chrome-url">https://acmecloud.example/register</code>
             <div className="demo-chrome-controls" role="group" aria-label="Simulation view">
               <button
                 type="button"
@@ -151,7 +151,7 @@ export function LandingShowcase({ onStart }: { onStart: () => void }) {
                 <div className="demo-mock-form">
                   <div className="demo-mock-input demo-target-email">
                     <span>Email</span>
-                    <code className="demo-type">alex@demo.local</code>
+                    <code className="demo-type">alex@example.com</code>
                   </div>
                   <div className="demo-mock-input masked demo-target-password">
                     <span>Pass</span>

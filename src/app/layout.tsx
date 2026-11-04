@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'GhostQA', description: 'Local demo website testing', icons: { icon: '/ghostqa-mark.svg' } };
+export const metadata: Metadata = { title: 'GhostQA', description: 'Browser-based website testing and design review', icons: { icon: '/ghostqa-mark.svg' } };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

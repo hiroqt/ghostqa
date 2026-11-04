@@ -271,7 +271,7 @@ export async function runDemo(url: string, goal: string, emit: Emit, mode: 'test
   } catch (error) {
     const reason = Date.now() - gate.startedAt >= 60_000 ? 'Run timed out'
       : error instanceof Error && /^(Action limit reached|Replay exceeds action limit)$/.test(error.message) ? error.message
-        : 'Run stopped safely; check the local fixture and Chromium';
+        : 'Run stopped safely; check the website and browser availability';
     const rawSuggestions = adapter
       ? await adapter.suggestImprovements(lastObservation?.dom ?? '', lastObservation?.screenshotPath ?? '').catch(() => [] as import('./contracts').Suggestion[])
       : [];

@@ -292,7 +292,7 @@ export default function Home() {
         <img className="brand-mark" src="/ghostqa-mark.svg" alt="" />
         <div className="brand-copy">
           <h1>GhostQA</h1>
-          <span>Local website testing</span>
+          <span>Website quality testing</span>
         </div>
       </header>
 
@@ -396,7 +396,7 @@ export default function Home() {
                       <option value="slop">AI slop design and code review</option>
                       <option value="technical">Technical security and performance review</option>
                     </select>
-                    <label htmlFor="url">{liveMode ? 'Website URL' : 'Local demo URL'}</label>
+                    <label htmlFor="url">Website URL</label>
                     <input
                       ref={urlInputRef}
                       id="url"
@@ -443,12 +443,11 @@ export default function Home() {
                   </form>
                   {liveMode ? (
                     <p className="hint">
-                      Enter a public URL. Private and internal addresses are blocked; review stays on one origin.
+                      Public pages are available for read-only reviews. Requests stay on one origin.
                     </p>
                   ) : (
                     <p className="hint">
-                      Fixture: <code>{demoOrigin}/register</code>, <code>/health</code>, or <code>/slop</code>. Use
-                      synthetic data only.
+                      Enter an authorized website URL. Use synthetic data only.
                     </p>
                   )}
                 </section>

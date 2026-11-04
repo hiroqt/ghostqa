@@ -19,7 +19,7 @@ export default function LandingPage() {
       </section>
 
       <section className="entry-website" aria-label="Illustration of a GhostQA website review">
-        <div className="entry-site-nav"><span className="entry-site-logo">demo<span>.</span></span><span>Product&nbsp;&nbsp;&nbsp; About&nbsp;&nbsp;&nbsp; Sign in</span></div>
+        <div className="entry-site-nav"><span className="entry-site-logo">AcmeCloud<span>.</span></span><span>Product&nbsp;&nbsp;&nbsp; About&nbsp;&nbsp;&nbsp; Sign in</span></div>
         <div className="entry-site-content">
           <div className="entry-site-copy"><small>WELCOME ABOARD</small><h2>Start something<br />remarkable.</h2><p>Build your account in just a few steps.</p><span className="entry-site-button">Create account ↗</span></div>
           <div className="entry-form"><span>YOUR EMAIL</span><div>you@example.com</div><span>PASSWORD</span><div>••••••••••••</div><b>Create account →</b><small>Something went wrong. Please try again.</small></div>
