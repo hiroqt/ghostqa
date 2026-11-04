@@ -18,13 +18,13 @@ Error codes:
 - `ORIGIN_DENIED`: the submitted URL's origin does not match any allowlist entry.
 - `PRIVATE_HOST_DENIED`: live-mode-only. The submitted URL targets a private/internal/loopback host and is rejected to prevent server-side request forgery against the operator's own network.
 
-Preconditions: the caller checks the initial URL before launching Chromium and checks every subsequent navigation and redirect URL before allowing it. Functional runs always use the configured local demo allowlist (defaulting to `http://127.0.0.1:3001`). Public live URLs are available only to GQ-011/GQ-012 read-only review modes when the operator sets `ALLOW_LIVE_SITES=true`; in those modes `ALLOWED_ORIGINS` is not required and the per-run allowed origin is taken from the submitted URL.
+Preconditions: the caller checks the initial URL before launching Chromium and checks every subsequent navigation and redirect URL before allowing it. By default, functional runs use the configured local demo allowlist (defaulting to `http://127.0.0.1:3001`). When the operator sets `ALLOW_LIVE_SITES=true`, any run may use one submitted public origin; `ALLOWED_ORIGINS` is not required. Public functional runs require `MODEL_MODE=meta` and a configured `MODEL_API_KEY`.
 
 Invariants / security:
 - Only HTTP(S) URLs without user information are accepted, in either mode.
 - `file:`, `data:`, and `javascript:` schemes, URLs with username or password, and any non-HTTP(S) scheme are always rejected.
 - Default (live mode off): allowed origins must be HTTP(S), have no path, query, fragment, or user information, and name an exact loopback host (`localhost`, `127.0.0.1`, or `[::1]`). Loopback is the ALLOWED target in this mode — the private-host rejection does NOT apply here, so the local fixture/e2e flow is unaffected.
-- Live mode on for GQ-011/GQ-012: the per-run allowlist is the ORIGIN of the submitted URL. That origin must be HTTP(S) with no user information, and must NOT resolve to a private/internal/loopback host (see SSRF list). The review stays locked to that single origin: `assertAllowedUrl` with `{ liveMode: true }` still enforces exact-origin matching for every subsequent navigation and redirect, so no cross-origin drift is possible mid-run. Functional runs continue to use `ALLOWED_ORIGINS` even when live review is enabled.
+- Live mode on: the per-run allowlist is the ORIGIN of the submitted URL. That origin must be HTTP(S) with no user information, and must NOT resolve to a private/internal/loopback host (see SSRF list). The run stays locked to that single origin: `assertAllowedUrl` with `{ liveMode: true }` enforces exact-origin matching for every subsequent navigation and redirect. Public functional runs require the Meta adapter; destructive HTTP methods and clearly high-impact actions/fields are blocked, while same-origin form POSTs may be used to verify a flow.
 - SSRF private-host rejection (live mode only). Reject when the submitted URL's hostname is any of:
   - `localhost` (and any hostname ending in `.localhost`)
   - loopback IPv4 `127.0.0.0/8` (any `127.x.x.x`)

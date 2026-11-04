@@ -38,18 +38,30 @@ test('rejects an external URL before launching a browser (live mode off)', async
   delete process.env.ALLOW_LIVE_SITES;
   const response = await POST(makeRequest({ url: 'https://example.com', goal: 'Register' }));
   expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ error: expect.stringContaining('http://127.0.0.1:3001') });
   expect(runDemo).not.toHaveBeenCalled();
 });
 
-test('live mode allows public URLs only for read-only reviews', async () => {
+test('live mode allows public functional runs only with the live model configured', async () => {
   process.env.ALLOW_LIVE_SITES = 'true';
   delete process.env.ALLOWED_ORIGINS;
-  const functional = await POST(makeRequest({ url: 'https://example.com/pricing', mode: 'test' }));
-  expect(functional.status).toBe(400);
+  process.env.MODEL_MODE = 'mock';
+  const mockFunctional = await POST(makeRequest({ url: 'https://example.com/pricing', mode: 'test' }));
+  expect(mockFunctional.status).toBe(503);
   expect(runDemo).not.toHaveBeenCalled();
 
+  process.env.MODEL_MODE = 'meta';
+  process.env.MODEL_API_KEY = 'test-key';
+  const functional = await POST(makeRequest({ url: 'https://example.com/pricing', mode: 'test' }));
+  expect(functional.status).toBe(200);
+  expect(runDemo).toHaveBeenCalledWith('https://example.com/pricing', '', expect.any(Function), 'test');
+  await drain(functional);
+  runDemo.mockClear();
+  expect(runDemo).not.toHaveBeenCalled();
+
+  process.env.MODEL_MODE = 'mock';
   const defaultFunctional = await POST(makeRequest({ url: 'https://example.com/pricing' }));
-  expect(defaultFunctional.status).toBe(400);
+  expect(defaultFunctional.status).toBe(503);
   expect(runDemo).not.toHaveBeenCalled();
 
   const response = await POST(makeRequest({ url: 'https://example.com/pricing', mode: 'slop' }));
