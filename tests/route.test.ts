@@ -41,12 +41,16 @@ test('rejects an external URL before launching a browser (live mode off)', async
   expect(runDemo).not.toHaveBeenCalled();
 });
 
-test('live mode accepts a public origin without ALLOWED_ORIGINS set', async () => {
+test('live mode allows public URLs only for read-only reviews', async () => {
   process.env.ALLOW_LIVE_SITES = 'true';
   delete process.env.ALLOWED_ORIGINS;
-  const response = await POST(makeRequest({ url: 'https://example.com/pricing' }));
+  const functional = await POST(makeRequest({ url: 'https://example.com/pricing', mode: 'test' }));
+  expect(functional.status).toBe(400);
+  expect(runDemo).not.toHaveBeenCalled();
+
+  const response = await POST(makeRequest({ url: 'https://example.com/pricing', mode: 'slop' }));
   expect(response.status).toBe(200);
-  expect(runDemo).toHaveBeenCalledWith('https://example.com/pricing', '', expect.any(Function), 'test');
+  expect(runDemo).toHaveBeenCalledWith('https://example.com/pricing', '', expect.any(Function), 'slop');
   await drain(response);
 });
 

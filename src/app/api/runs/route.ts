@@ -21,24 +21,26 @@ export async function POST(request: Request): Promise<Response> {
   }
   let input: z.infer<typeof runRequest>;
   let url: string;
+  let publicReview = false;
   try {
     input = runRequest.parse(await request.json());
-    if (liveMode) {
+    publicReview = liveMode && input.mode !== 'test';
+    if (publicReview) {
       // Live mode: the per-run allowlist is derived from the submitted URL's
-      // origin. ALLOWED_ORIGINS is not required; private/internal hosts are
-      // rejected (SSRF). The run stays locked to this single origin.
+      // origin for the read-only review modes. ALLOWED_ORIGINS is not required;
+      // private/internal hosts are rejected (SSRF), and the run stays on-origin.
       url = assertLiveUrl(input.url).url;
     } else {
-      // Safe default: loopback-only, allowlist from ALLOWED_ORIGINS.
+      // Functional runs always use the configured loopback demo allowlist.
       const origins = (process.env.ALLOWED_ORIGINS ?? 'http://127.0.0.1:3001')
         .split(',').map((origin) => origin.trim()).filter(Boolean);
       url = assertAllowedUrl(input.url, origins);
     }
   } catch (err) {
     const code = err instanceof Error ? (err as { code?: string }).code ?? err.message : String(err);
-    const message = liveMode
+    const message = publicReview
       ? `Enter a valid public URL (https://example.com). Private and internal addresses are not allowed. [${code}]`
-      : 'Only the configured local demo URL is allowed';
+      : 'This website URL is not enabled for this run.';
     return Response.json({ error: message }, { status: 400 });
   }
   if (running) return Response.json({ error: 'A run is already active' }, { status: 409 });
@@ -54,7 +56,7 @@ export async function POST(request: Request): Promise<Response> {
         .then(({ report, screenshot, highlight }) => emit({ type: 'done', report, screenshot, highlight }))
         .catch((error: unknown) => {
           const message = error instanceof Error && /^(Action limit reached|Run timed out|Replay exceeds action limit)$/.test(error.message)
-            ? error.message : 'Run stopped safely; check the local fixture and Chromium';
+            ? error.message : 'Run stopped safely; check the website and browser availability';
           emit({ type: 'error', message });
         })
         .finally(() => { running = false; if (!cancelled) controller.close(); });
