@@ -48,6 +48,10 @@ test('live mode allows public URLs only for read-only reviews', async () => {
   expect(functional.status).toBe(400);
   expect(runDemo).not.toHaveBeenCalled();
 
+  const defaultFunctional = await POST(makeRequest({ url: 'https://example.com/pricing' }));
+  expect(defaultFunctional.status).toBe(400);
+  expect(runDemo).not.toHaveBeenCalled();
+
   const response = await POST(makeRequest({ url: 'https://example.com/pricing', mode: 'slop' }));
   expect(response.status).toBe(200);
   expect(runDemo).toHaveBeenCalledWith('https://example.com/pricing', '', expect.any(Function), 'slop');

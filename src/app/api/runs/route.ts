@@ -24,7 +24,7 @@ export async function POST(request: Request): Promise<Response> {
   let publicReview = false;
   try {
     input = runRequest.parse(await request.json());
-    publicReview = liveMode && input.mode !== 'test';
+    publicReview = liveMode && (input.mode ?? 'test') !== 'test';
     if (publicReview) {
       // Live mode: the per-run allowlist is derived from the submitted URL's
       // origin for the read-only review modes. ALLOWED_ORIGINS is not required;
