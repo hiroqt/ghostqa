@@ -1,6 +1,21 @@
 # GhostQA
 
-GhostQA tests one authorized local demo website, records a bounded browser trace, and reports a bug only after a repeatable observed failure. Its separate AI slop pattern review can inspect one public URL when live mode is explicitly enabled. The MVP is a hackathon demonstration, not a general website scanner.
+GhostQA checks whether a website behaves the way a developer expects, then shows the browser evidence behind its result. It is built for a common gap in web development: a page can look finished while a key workflow is broken, and reproducing the failure by hand takes time.
+
+## What GhostQA does
+
+For a functional check, a developer provides the configured local demo URL and a goal, such as trying to register. GhostQA opens one Chromium session, observes the page, and carries out a small set of policy-checked browser actions. It records a bounded action trace, screenshots, and relevant browser errors. If it suspects a failure, it retries once in a fresh browser context. It reports a bug only when the failure is supported by observable evidence and reproduced; otherwise it returns a no-finding or inconclusive result.
+
+GhostQA also has two separate review modes. The design review measures the page Chromium rendered and uses delivered same-origin source as supporting evidence. The technical review looks for bounded, static signals in the page and its delivered source. With live mode explicitly enabled, these two reviews can inspect one public URL using read-only requests. Neither mode determines whether a person or AI authored a page, and the technical review is not a penetration test.
+
+## What makes it different
+
+- **Evidence before claims:** a model suggestion is only a hypothesis. Functional bugs need deterministic browser evidence and one successful replay before GhostQA calls them verified.
+- **The rendered page comes first:** design feedback is grounded in measured styles and visible composition; source patterns provide context rather than deciding the verdict alone.
+- **A deliberately narrow run:** one origin, bounded actions and time, and no crawling or automatic fixes. Public reviews stay on the submitted origin and use GET/HEAD requests only.
+- **Honest outcomes:** GhostQA can say no finding or insufficient evidence instead of turning a heuristic into a confirmed defect.
+
+GhostQA is a hackathon MVP for bounded checks and reviews, not a general website scanner. Functional checks use the configured local demo URL; public URLs are available only for the explicitly enabled read-only review modes.
 
 ## Run locally
 

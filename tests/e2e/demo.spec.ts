@@ -16,7 +16,7 @@ test('landing introduces GhostQA and enters the dashboard on desktop and mobile'
   await expect(page.getByRole('region', { name: 'Illustration of a GhostQA website review' })).toBeVisible();
   await expect(page.locator('.entry-globe')).toBeVisible();
   await expect(page.locator('.entry-website .entry-demo-cta')).toBeVisible();
-  await expect(page.locator('.entry-site-logo')).toHaveText('demo.');
+  await expect(page.locator('.entry-site-logo')).toHaveText('AcmeCloud.');
   expect(await page.locator('.entry-website').evaluate((node) => getComputedStyle(node).borderTopLeftRadius)).toBe('0px');
   await page.locator('.entry-demo-cta').hover();
   await expect(page.locator('.entry-demo-cta')).toHaveCSS('box-shadow', /rgba/);
@@ -49,7 +49,7 @@ test('workspace layout keeps progress and content readable on desktop and mobile
   await expect(tagline).toBeVisible();
   await expect(tagline.locator('.tagline-problem strong')).toContainText(/AI-generated websites are everywhere/i);
   await expect(tagline.locator('.tagline-solution strong')).toContainText(/GhostQA runs guarded Chromium checks/i);
-  const designDemo = contentHeader.getByRole('region', { name: 'Animated design and workflow verification demo' });
+  const designDemo = contentHeader.getByRole('region', { name: 'Animated design and workflow verification' });
   await expect(designDemo).toBeVisible();
   await expect(designDemo.getByTestId('demo-web-navbar')).toBeVisible();
   await expect(designDemo.getByTestId('demo-web-hero')).toBeVisible();
@@ -73,7 +73,7 @@ test('workspace layout keeps progress and content readable on desktop and mobile
   await expect(jumpButton).toBeVisible();
   await jumpButton.click();
   await expect(page.getByRole('heading', { name: 'Test workspace' })).toBeVisible();
-  await expect(page.getByLabel('Local demo URL')).toBeFocused();
+  await expect(page.getByLabel('Website URL')).toBeFocused();
   await expect(page.getByRole('complementary', { name: 'Run progress' })).toBeVisible();
   await expect(page.locator('.app-header .mode')).toHaveCount(0);
   await expect(page.locator('.sidebar-stage .stage-indicator svg')).toHaveCount(8);
@@ -101,6 +101,7 @@ test('workspace layout keeps progress and content readable on desktop and mobile
 test('seeded registration failure is replayed and reported with evidence', async ({ page }) => {
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/register');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('dialog', { name: 'Live evaluation preview' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Evaluation stage progress' })).toBeVisible();
@@ -141,7 +142,7 @@ test('healthy demo flow has no fabricated finding', async ({ page }) => {
   await expect(page.getByRole('group', { name: 'Common functional test goals' })).toBeVisible();
   await page.getByRole('button', { name: 'Page health & console' }).click();
   await expect(page.getByLabel('Goal (optional)')).toHaveValue('Verify the page renders its main heading cleanly with no HTTP or console errors');
-  await page.getByLabel('Local demo URL').fill('http://127.0.0.1:3201/health');
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/health');
   await page.getByLabel('Goal (optional)').fill('');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('status')).toHaveText('Complete', { timeout: 60_000 });
@@ -156,7 +157,7 @@ test('AI slop review stamps only a rendered-design verdict, with guideline cues 
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Review type').selectOption('slop');
-  await expect(page.getByLabel('Local demo URL')).toHaveValue('http://127.0.0.1:3201/slop');
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/slop');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByText('Analyzing page design')).toBeVisible();
   await expect(page.getByLabel('Live page observation')).toHaveCount(0);
@@ -194,7 +195,7 @@ test('AI slop review stamps only a rendered-design verdict, with guideline cues 
   expect(guide).not.toContain('sensitive-debug-value');
   expect(guide).not.toContain('Automate anything');
 
-  await page.getByLabel('Local demo URL').fill('http://127.0.0.1:3201/health');
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/health');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByText('Insufficient evidence for a design verdict')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText('AI SLOP', { exact: true })).toHaveCount(0);
@@ -203,9 +204,9 @@ test('AI slop review stamps only a rendered-design verdict, with guideline cues 
 test('external URL is rejected before a browser run', async ({ page }) => {
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
-  await page.getByLabel('Local demo URL').fill('https://example.com');
+  await page.getByLabel('Website URL').fill('https://example.com');
   await page.getByRole('button', { name: 'Start test' }).click();
-  await expect(page.getByRole('status')).toHaveText('Only the configured local demo URL is allowed');
+  await expect(page.getByRole('status')).toHaveText('This website URL is not enabled for this run.');
   await expect(page.getByText('Actions will appear here as they run.')).toBeVisible();
 });
 
@@ -213,6 +214,7 @@ test('technical review shows read-only observations without a bypass claim', asy
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Review type').selectOption('technical');
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/slop');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('heading', { name: 'Technical observations' })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText('Findings are signals, not verified exploits or compliance verdicts.', { exact: false })).toBeVisible();
