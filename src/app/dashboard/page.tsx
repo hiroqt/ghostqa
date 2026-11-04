@@ -436,7 +436,7 @@ export default function Home() {
                   </form>
                   {liveMode ? (
                     <p className="hint">
-                      Public pages are available for read-only reviews. Requests stay on one origin.
+                      Public functional runs require the live model. All public runs stay on one origin and reject private addresses.
                     </p>
                   ) : (
                     <p className="hint">

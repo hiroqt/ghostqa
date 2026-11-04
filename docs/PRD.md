@@ -13,7 +13,7 @@ As a developer, I enter my local demo URL and a goal (e.g. "try registering"), s
 ## MVP requirements
 | ID | Priority | Requirement | Acceptance criteria |
 |---|---|---|---|
-| GQ-001 | P0 | Safe run setup | Reject non-allowlisted URL and unsupported schemes; accept configured localhost demo URL only. |
+| GQ-001 | P0 | Safe run setup | Reject non-allowlisted URL and unsupported schemes; default to the configured localhost demo URL. With `ALLOW_LIVE_SITES=true`, accept one user-submitted public origin for any run; public functional runs require the Meta adapter and retain bounded, typed actions and same-origin/private-host protections. |
 | GQ-002 | P0 | Browser observer | Capture screenshot, sanitized compact DOM controls, console errors and relevant HTTP failures; redact secrets. |
 | GQ-003 | P0 | Meta reasoning adapter | Adapter accepts observation + goal + prior trace and returns schema-validated action or STOP; mock available for deterministic tests. |
 | GQ-004 | P0 | Guarded executor | Allow only typed actions, exact origin, max 10 actions, 60s timeout; stop safely on violation. |

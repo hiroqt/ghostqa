@@ -2,7 +2,7 @@
 Version 0.1 | MVP constraints
 
 ## Architecture
-Next.js UI -> server-side run controller -> policy gate -> Playwright Chromium -> one allowed origin. The default is the local demo; GQ-011 and GQ-012 may review a public origin in explicit live mode. Observer collects screenshot, sanitized DOM and errors. Model adapter proposes a typed action for functional tests. Evaluator compares expected and actual. Replay verifier checks suspected failure. Reporter produces one result.
+Next.js UI -> server-side run controller -> policy gate -> Playwright Chromium -> one allowed origin. The default is the local demo; any run may target one public origin in explicit live mode. Public functional runs require the Meta model and use the same bounded action policy. Observer collects screenshot, sanitized DOM and errors. Model adapter proposes a typed action for functional tests. Evaluator compares expected and actual. Replay verifier checks suspected failure. Reporter produces one result.
 
 ## Modules and contracts
 - `src/lib/contracts.ts`: `Observation`, `ProposedAction`, `ActionTrace`, and model `Decision` types; Zod runtime validation of model actions.

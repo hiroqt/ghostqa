@@ -4,10 +4,10 @@
 Build the smallest demonstrable GhostQA MVP during the hackathon. Read in order: `docs/PRD.md`, `docs/ARD.md`, `docs/SDD.md`, `docs/TDD.md`, `docs/specs/README.md`, then this file. Requirement IDs in PRD are the source of truth; architecture must satisfy them. If documents conflict, stop and request a decision; do not silently improvise.
 
 ## Non-negotiable scope
-- One authorized website per run, locally hosted by default; GQ-011 and GQ-012 may use one public URL in explicit live mode. One Chromium session; maximum 10 browser actions; one verified functional finding per run.
+- One authorized website per run, locally hosted by default; explicit live mode may use one public URL for functional, GQ-011, or GQ-012 runs. Public functional runs require the configured Meta adapter. One Chromium session; maximum 10 browser actions; one verified functional finding per run.
 - User enters an allowlisted URL and optional goal. Agent observes screenshot + compact sanitized DOM, proposes a single typed action, executes it through a policy gate, observes outcome, and may reproduce a suspected bug once.
 - Deliver screenshot evidence, relevant console/network metadata, expected-vs-actual, replay steps, and generated Playwright reproduction test only for a verified finding.
-- No user accounts, billing, deployments, distributed workers, GitHub issue creation, auto-fixing, multi-agent orchestration, persistent user data, or production crawling. GQ-011 and GQ-012 may each review one user-submitted public URL in explicit live mode, locked to its origin and read-only requests.
+- No user accounts, billing, deployments, distributed workers, GitHub issue creation, auto-fixing, multi-agent orchestration, persistent user data, or production crawling. GQ-011 and GQ-012 may each review one user-submitted public URL in explicit live mode, locked to its origin and read-only requests. Public functional runs remain on one origin and may submit bounded same-origin forms.
 - Use TypeScript, Next.js, Node.js, Playwright. Meta integration behind an interface. Never claim a specific model or endpoint works until confirmed by live docs and a smoke test.
 
 ## Work protocol: SDD -> TDD -> code
@@ -25,7 +25,7 @@ Build the smallest demonstrable GhostQA MVP during the hackathon. Read in order:
 - Do not add dependencies or features outside scope without explicit approval.
 
 ## Hard safety gates
-- URLs must be HTTP(S) and match the exact local demo host allowlist by default. Explicit GQ-011 and GQ-012 live reviews use the existing public URL admission policy and lock to that one origin. Reject redirects outside the allowed origin, private network pivoting, file/data/javascript URLs, and cross-origin navigation.
+- URLs must be HTTP(S) and match the exact local demo host allowlist by default. Explicit live runs use the existing public URL admission policy and lock to that one origin; GQ-011 and GQ-012 remain read-only. Reject redirects outside the allowed origin, private network pivoting, file/data/javascript URLs, and cross-origin navigation.
 - Only allow: navigate, click, fill, press, scroll, wait. Deny downloads, uploads, payments, deletes, email sends, shell execution, arbitrary JS evaluation, and browser permission prompts.
 - Cap at 10 actions, 60s wall-clock per run, 1 retry for suspected finding. No unbounded recursion.
 - Mask passwords, tokens, cookies, and PII from prompts, logs, screenshots when feasible; use synthetic demo data only.

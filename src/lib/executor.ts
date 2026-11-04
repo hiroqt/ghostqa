@@ -8,6 +8,9 @@ export function authorizeAction(raw: unknown, gate: RunGate): ProposedAction {
   if (gate.actionCount >= 10) throw new Error('Action limit reached');
   if (Date.now() - gate.startedAt >= 60_000) throw new Error('Run timed out');
   const action = proposedActionSchema.parse(raw);
+  if ((action.type === 'click' || action.type === 'press') && /\b(delete|erase|remove|purchase|pay|checkout|subscribe|unsubscribe|send|place order)\b/i.test(action.target ?? '')) {
+    throw new Error('Unsafe action target');
+  }
 
   switch (action.type) {
     case 'navigate':
@@ -28,6 +31,9 @@ export function authorizeAction(raw: unknown, gate: RunGate): ProposedAction {
       }
       break;
     case 'fill':
+      if (/\b(payment|credit card|card number|cvv|cvc|security code|bank account)\b/i.test(action.target ?? '')) {
+        throw new Error('Unsafe fill target');
+      }
       if (!action.target || action.value === undefined || (!gate.liveMode && !['Email', 'Password'].includes(action.target))) {
         throw new Error('Unsafe fill target');
       }
@@ -65,6 +71,8 @@ export async function installNetworkGuard(
       // sub-resource requests within the already-allowlisted origin.
       const url = assertAllowedUrl(route.request().url(), allowedOrigins, { liveMode });
       if (readOnly && !['GET', 'HEAD'].includes(route.request().method())) throw new Error('Review request method denied');
+      if (liveMode && !readOnly && !['GET', 'HEAD', 'POST'].includes(route.request().method())) throw new Error('Request method denied');
+      if (liveMode && !readOnly && route.request().method() === 'POST' && /\b(delete|erase|remove|purchase|pay|checkout|subscribe|unsubscribe|send|order)\b/i.test(new URL(url).pathname)) throw new Error('Request path denied');
       if (!liveMode) {
         const method = route.request().method();
         const parsed = new URL(url);

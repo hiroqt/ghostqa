@@ -17,6 +17,15 @@ test('permits only bounded typed actions on the demo origin', () => {
   expect(() => authorizeAction({ type: 'wait', value: '200' }, { ...state, startedAt: Date.now() - 60_001 })).toThrow();
 });
 
+test('live functional runs reject high-impact controls and sensitive payment fields', () => {
+  const live = { ...state, allowedOrigins: ['https://example.com'], liveMode: true };
+  expect(authorizeAction({ type: 'click', target: 'Create account' }, live).type).toBe('click');
+  expect(() => authorizeAction({ type: 'click', target: 'Purchase plan' }, live)).toThrow('Unsafe action target');
+  expect(() => authorizeAction({ type: 'click', target: 'Send message' }, live)).toThrow('Unsafe action target');
+  expect(() => authorizeAction({ type: 'press', target: 'Pay now', value: 'Enter' }, live)).toThrow('Unsafe action target');
+  expect(() => authorizeAction({ type: 'fill', target: 'Credit card number', value: '123' }, live)).toThrow('Unsafe fill target');
+});
+
 test('aborts cross-origin redirects and unapproved local requests', async () => {
   let guard: ((route: Route) => Promise<void>) | undefined;
   const context = { route: async (_pattern: string, callback: (route: Route) => Promise<void>) => { guard = callback; } } as unknown as BrowserContext;
@@ -72,6 +81,27 @@ test('live review allows same-origin reads and blocks writes and cross-origin re
     abort: async () => { outcomes.push('aborted'); },
   } as unknown as Route);
   expect(outcomes).toEqual(['continued', 'continued', 'aborted', 'aborted']);
+});
+
+test('live functional runs allow same-origin form posts but deny destructive HTTP methods', async () => {
+  let guard: ((route: Route) => Promise<void>) | undefined;
+  const context = { route: async (_pattern: string, callback: (route: Route) => Promise<void>) => { guard = callback; } } as unknown as BrowserContext;
+  await installNetworkGuard(context, ['https://example.com'], true, false);
+  if (!guard) throw new Error('Network guard was not installed');
+  const outcomes: string[] = [];
+  for (const method of ['GET', 'POST', 'DELETE', 'OPTIONS']) {
+    await guard({
+      request: () => ({ url: () => 'https://example.com/register', method: () => method }),
+      continue: async () => { outcomes.push('continued'); },
+      abort: async () => { outcomes.push('aborted'); },
+    } as unknown as Route);
+  }
+  await guard({
+    request: () => ({ url: () => 'https://example.com/checkout', method: () => 'POST' }),
+    continue: async () => { outcomes.push('continued'); },
+    abort: async () => { outcomes.push('aborted'); },
+  } as unknown as Route);
+  expect(outcomes).toEqual(['continued', 'continued', 'aborted', 'aborted', 'aborted']);
 });
 
 test('executeAction falls back to substring-matched control or input placeholder when exact match is missing', async () => {

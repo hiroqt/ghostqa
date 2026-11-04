@@ -206,7 +206,7 @@ test('external URL is rejected before a browser run', async ({ page }) => {
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Website URL').fill('https://example.com');
   await page.getByRole('button', { name: 'Start test' }).click();
-  await expect(page.getByRole('status')).toHaveText('This website URL is not enabled for this run.');
+  await expect(page.getByRole('status')).toContainText('This website URL is not enabled for this run. Use the configured local demo origin:');
   await expect(page.getByText('Actions will appear here as they run.')).toBeVisible();
 });
 
