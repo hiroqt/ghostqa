@@ -17,7 +17,6 @@ import '../style.css';
 import '../interactive.css';
 
 const liveMode = process.env.NEXT_PUBLIC_ALLOW_LIVE_SITES === 'true';
-const demoOrigin = process.env.NEXT_PUBLIC_DEMO_ORIGIN ?? 'http://127.0.0.1:3001';
 
 // ─── Stage definitions ────────────────────────────────────────────────────
 
@@ -65,7 +64,7 @@ function isAnimatingStage(stage: Stage): boolean {
 }
 
 export default function Home() {
-  const [url, setUrl] = useState(liveMode ? '' : `${demoOrigin}/register`);
+  const [url, setUrl] = useState('');
   const [goal, setGoal] = useState(liveMode ? '' : 'Try registering');
   const [reviewType, setReviewType] = useState<'test' | 'slop' | 'technical'>('test');
   const [status, setStatus] = useState('Ready');
@@ -387,11 +386,7 @@ export default function Home() {
                   <h2 id="run-title">Start a run</h2>
                   <form onSubmit={start}>
                     <label htmlFor="review-type">Review type</label>
-                    <select id="review-type" value={reviewType} onChange={(event) => {
-                      const next = event.target.value as 'test' | 'slop' | 'technical';
-                      if (!liveMode && url === `${demoOrigin}/${reviewType === 'test' ? 'register' : 'slop'}`) setUrl(`${demoOrigin}/${next === 'test' ? 'register' : 'slop'}`);
-                      setReviewType(next);
-                    }} disabled={running}>
+                    <select id="review-type" value={reviewType} onChange={(event) => setReviewType(event.target.value as 'test' | 'slop' | 'technical')} disabled={running}>
                       <option value="test">Functional test</option>
                       <option value="slop">AI slop design and code review</option>
                       <option value="technical">Technical security and performance review</option>
@@ -403,9 +398,7 @@ export default function Home() {
                       type="url"
                       required
                       value={url}
-                      placeholder={
-                        liveMode ? 'https://example.com' : `${demoOrigin}/${reviewType === 'slop' ? 'slop' : 'register'}`
-                      }
+                      placeholder="Enter website URL"
                       onChange={(event) => setUrl(event.target.value)}
                       disabled={running}
                     />
@@ -447,7 +440,7 @@ export default function Home() {
                     </p>
                   ) : (
                     <p className="hint">
-                      Enter an authorized website URL. Use synthetic data only.
+                      Enter the website URL enabled for functional testing. Use synthetic data only.
                     </p>
                   )}
                 </section>

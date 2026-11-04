@@ -101,6 +101,7 @@ test('workspace layout keeps progress and content readable on desktop and mobile
 test('seeded registration failure is replayed and reported with evidence', async ({ page }) => {
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/register');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('dialog', { name: 'Live evaluation preview' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Evaluation stage progress' })).toBeVisible();
@@ -156,7 +157,7 @@ test('AI slop review stamps only a rendered-design verdict, with guideline cues 
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Review type').selectOption('slop');
-  await expect(page.getByLabel('Website URL')).toHaveValue('http://127.0.0.1:3201/slop');
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/slop');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByText('Analyzing page design')).toBeVisible();
   await expect(page.getByLabel('Live page observation')).toHaveCount(0);
@@ -213,6 +214,7 @@ test('technical review shows read-only observations without a bypass claim', asy
   await page.goto('/dashboard');
   await page.getByRole('button', { name: 'Go to test workspace' }).click();
   await page.getByLabel('Review type').selectOption('technical');
+  await page.getByLabel('Website URL').fill('http://127.0.0.1:3201/slop');
   await page.getByRole('button', { name: 'Start test' }).click();
   await expect(page.getByRole('heading', { name: 'Technical observations' })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText('Findings are signals, not verified exploits or compliance verdicts.', { exact: false })).toBeVisible();
